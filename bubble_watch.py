@@ -64,11 +64,26 @@ def fetch_fred(series_id: str, freq=None) -> pd.Series:
     return pd.Series(vals, index=dates).dropna()
 
 
-def fetch_yahoo(symbol, period="max") -> pd.Series:
+def fetch_yahoo(symbol, start="1980-01-01") -> pd.Series:
     """Fetch a single Yahoo Finance series and return a clean 1D Series."""
-    df = yf.download(
-        symbol, period=period, progress=False, auto_adjust=False, group_by="column"
-    )
+    try:
+        df = yf.download(
+            symbol,
+            start=start,
+            progress=False,
+            auto_adjust=False,
+            group_by="column",
+            threads=False,
+        )
+    except Exception:
+        df = pd.DataFrame()
+
+    if df.empty:
+        try:
+            df = pdr.get_data_yahoo(symbol, start=start)
+        except Exception as exc:
+            raise RuntimeError(f"Failed to fetch data for {symbol}") from exc
+
     if isinstance(df, pd.DataFrame):
         # prefer 'Adj Close' if present
         if "Adj Close" in df.columns:
@@ -159,6 +174,84 @@ def compute_weekly_m2_yoy() -> tuple[pd.Series, pd.Series]:
     m2_weekly = m2_weekly.ffill()
     m2_yoy_weekly = m2_weekly.pct_change(52) * 100
     return m2_weekly, m2_yoy_weekly
+
+
+def build_validation_tables(
+    hist_df: pd.DataFrame,
+    horizons: tuple[int, ...] = (6, 12),
+    threshold: float = -0.15,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Evaluate forward drawdowns after composite breaches."""
+    records = []
+    composite = hist_df["Composite"]
+    prices = hist_df["SP500"]
+
+    for idx in range(len(hist_df)):
+        if composite.iloc[idx] <= 1.0:
+            continue
+        start_date = hist_df.index[idx]
+        start_price = prices.iloc[idx]
+        for horizon in horizons:
+            future_prices = prices.iloc[idx : idx + horizon + 1]
+            if len(future_prices) <= 1:
+                continue
+            rel_returns = future_prices / start_price - 1.0
+            max_dd = float(rel_returns.min())
+            hit = bool(max_dd <= threshold)
+            lead_months = float("nan")
+            if hit:
+                for step, val in enumerate(rel_returns.iloc[1:], start=1):
+                    if val <= threshold:
+                        lead_months = float(step)
+                        break
+            records.append(
+                {
+                    "signal_date": start_date,
+                    "horizon_months": horizon,
+                    "composite_at_signal": float(composite.iloc[idx]),
+                    "max_forward_drawdown": max_dd,
+                    "hit_threshold": hit,
+                    "threshold_lead_months": lead_months,
+                }
+            )
+
+    columns = [
+        "signal_date",
+        "horizon_months",
+        "composite_at_signal",
+        "max_forward_drawdown",
+        "hit_threshold",
+        "threshold_lead_months",
+    ]
+    signals_df = pd.DataFrame(records, columns=columns)
+
+    summary_rows = []
+    for horizon in horizons:
+        subset = signals_df[signals_df["horizon_months"] == horizon]
+        total = len(subset)
+        hits = subset["hit_threshold"].sum() if total else 0
+        hit_rate = hits / total if total else float("nan")
+        avg_hit_lead = (
+            subset.loc[subset["hit_threshold"], "threshold_lead_months"].mean()
+            if hits
+            else float("nan")
+        )
+        median_dd = subset["max_forward_drawdown"].median() if total else float("nan")
+        worst_dd = subset["max_forward_drawdown"].min() if total else float("nan")
+        summary_rows.append(
+            {
+                "horizon_months": horizon,
+                "signals": total,
+                "hits": int(hits),
+                "hit_rate": hit_rate,
+                "avg_hit_lead_months": avg_hit_lead,
+                "median_drawdown": median_dd,
+                "worst_drawdown": worst_dd,
+            }
+        )
+
+    summary_df = pd.DataFrame(summary_rows)
+    return signals_df, summary_df
 
 
 def fetch_shiller_local_xls(path="data/ie_data.xls") -> pd.Series:
@@ -334,6 +427,8 @@ hist_df["Composite"] = (
 )
 hist_df["SPX_Drawdown"] = hist_df["SP500"] / hist_df["SP500"].cummax() - 1.0
 
+signals_df, summary_df = build_validation_tables(hist_df)
+
 # === Latest snapshot ===
 buffett_z = float(hist_df["Buffett_z"].iloc[-1])
 cape_z = float(hist_df["CAPE_z"].iloc[-1])
@@ -437,6 +532,12 @@ for name in ["Buffett_ratio", "CAPE", "CI_Loans_YoY", "M2_YoY", "VIX", "HY_Sprea
         f" contribution={df.loc[name, 'Contribution']:.2f}"
     )
 
+if summary_df.empty:
+    print("\nNo composite signals above threshold available for validation yet.")
+else:
+    print("\nForward drawdown validation (Composite > 1, drawdown ≤ -15%):")
+    print(summary_df.round(3).to_string(index=False))
+
 os.makedirs("output", exist_ok=True)
 df.to_html("output/bubbly_report.html")
 print("\nReport saved to output/bubbly_report.html")
@@ -460,6 +561,8 @@ history_cols = [
     "SPX_Drawdown",
 ]
 hist_df[history_cols].to_csv("output/bubbly_history.csv", float_format="%.4f")
+signals_df.to_csv("output/bubbly_validation_signals.csv", index=False)
+summary_df.to_csv("output/bubbly_validation_summary.csv", index=False)
 
 # Plot composite vs SPX drawdown
 fig, ax1 = plt.subplots(figsize=(11, 6))

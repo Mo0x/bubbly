@@ -4,6 +4,7 @@ Bubbly v1.1 – multi-source Bubble Phase Monitor
 """
 
 import os
+from pathlib import Path
 import pandas as pd
 import numpy as np
 import yfinance as yf
@@ -11,6 +12,24 @@ from pandas_datareader import data as pdr
 import urllib.request, urllib.parse, json
 
 # === Keys ===
+
+def load_api_keys(env_path: str = "apikeys.env") -> None:
+    """Populate missing env vars from simple KEY=VALUE file."""
+    path = Path(env_path)
+    if not path.is_file():
+        return
+
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        if key and value and key not in os.environ:
+            os.environ[key] = value
+
+
+load_api_keys()
+
 FRED_KEY = os.environ.get("FRED_API_KEY", "")
 QUANDL_KEY = os.environ.get("QUANDL_API_KEY", "")
 
@@ -42,7 +61,7 @@ def fetch_fred(series_id: str, freq=None) -> pd.Series:
 
 def fetch_yahoo(symbol, period="max") -> pd.Series:
     """Fetch a single Yahoo Finance series and return a clean 1D Series."""
-    df = yf.download(symbol, period=period, progress=False)
+    df = yf.download(symbol, period=period, progress=False, auto_adjust=False)
     if isinstance(df, pd.DataFrame):
         # prefer 'Adj Close' if present
         if "Adj Close" in df.columns:

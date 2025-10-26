@@ -20,9 +20,10 @@ def fetch_fred(series_id: str, freq=None) -> pd.Series:
     """Fetch FRED series and return as pandas Series"""
     params = {
         "series_id": series_id,
-        "api_key": FRED_KEY,
-        "file_type": "json"
+        "file_type": "json",
     }
+    if FRED_KEY:
+        params["api_key"] = FRED_KEY
     if freq:
         params["frequency"] = freq
     url = "https://api.stlouisfed.org/fred/series/observations?" + urllib.parse.urlencode(params)

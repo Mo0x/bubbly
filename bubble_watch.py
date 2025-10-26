@@ -16,6 +16,8 @@ import pandas as pd
 import yfinance as yf
 from pandas_datareader import data as pdr
 
+from html_report import save_html_report
+
 # === Keys ===
 
 def load_api_keys(env_path: str = "apikeys.env") -> None:
@@ -538,10 +540,6 @@ else:
     print("\nForward drawdown validation (Composite > 1, drawdown ≤ -15%):")
     print(summary_df.round(3).to_string(index=False))
 
-os.makedirs("output", exist_ok=True)
-df.to_html("output/bubbly_report.html")
-print("\nReport saved to output/bubbly_report.html")
-
 # Persist historical backtest
 history_cols = [
     "Buffett",
@@ -560,6 +558,7 @@ history_cols = [
     "SP500",
     "SPX_Drawdown",
 ]
+os.makedirs("output", exist_ok=True)
 hist_df[history_cols].to_csv("output/bubbly_history.csv", float_format="%.4f")
 signals_df.to_csv("output/bubbly_validation_signals.csv", index=False)
 summary_df.to_csv("output/bubbly_validation_summary.csv", index=False)
@@ -595,3 +594,18 @@ plt.close(fig)
 
 print("Historical series saved to output/bubbly_history.csv")
 print("Backtest chart saved to output/bubbly_backtest.png")
+
+report_path = save_html_report(
+    overview_df=df,
+    validation_summary=summary_df,
+    source_dates=source_dates,
+    composite_value=comp,
+    phase=phase,
+    pressure=pressure,
+    trigger=trigger,
+    data_coverage=composite_last_date,
+    output_dir="output",
+    history_chart_filename="bubbly_backtest.png",
+)
+
+print(f"\nReport saved to {report_path}")

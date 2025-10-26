@@ -209,22 +209,46 @@ df = pd.DataFrame(
 ).set_index("indicator")
 
 # === Composite phase ===
-comp = df["Z-score"].mean()
-if comp < 1.5:
+weights = {
+    "Buffett_ratio": 0.4,
+    "CAPE": 0.4,
+    "M2_YoY": -0.1,
+    "VIX": -0.1,
+}
+
+df["Weight"] = df.index.map(weights.get)
+df["Contribution"] = df["Z-score"] * df["Weight"]
+
+comp = df["Contribution"].sum()
+if comp < 1.0:
     phase = "Expansion"
 elif comp < 2.0:
     phase = "Euphoria"
 else:
     phase = "Instability"
 
+# Diagnostic split between valuation "pressure" and liquidity/volatility "triggers"
+pressure = 0.5 * (
+    df.loc["Buffett_ratio", "Z-score"] + df.loc["CAPE", "Z-score"]
+)
+trigger = -0.5 * (
+    df.loc["M2_YoY", "Z-score"] + df.loc["VIX", "Z-score"]
+)
+
 pd.set_option("display.max_columns", None)
 pd.set_option("display.width", 100)
 print("\n--- BUBBLY REPORT ---")
 print(df.round(2))
 print(f"\nComposite phase index: {comp:.2f} → {phase}")
+print(
+    f"Valuation pressure: {pressure:.2f} | Liquidity/vol trigger: {trigger:.2f}"
+)
 print("\nDebug check:")
 for name in ["Buffett_ratio", "CAPE", "M2_YoY", "VIX"]:
-    print(name, "mean:", df.loc[name, "Z-score"])
+    print(
+        f"{name} z={df.loc[name, 'Z-score']:.2f} weight={df.loc[name, 'Weight']:.2f}"
+        f" contribution={df.loc[name, 'Contribution']:.2f}"
+    )
 
 os.makedirs("output", exist_ok=True)
 df.to_html("output/bubbly_report.html")

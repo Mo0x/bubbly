@@ -1,2 +1,4 @@
 venv/
 apikeys.env
+__pycache__/
+=2.0.1

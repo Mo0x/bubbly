@@ -127,8 +127,18 @@ def expanding_zscore(series: pd.Series, min_periods: int = 24) -> pd.Series:
     """Compute expanding z-score to avoid look-ahead bias in history."""
     exp = series.expanding(min_periods=min_periods)
     mean = exp.mean()
-    std = exp.std().replace(0, np.nan)
-    return (series - mean) / std
+    std_raw = exp.std()
+
+    count = exp.count()
+    valid = count >= min_periods
+
+    std = std_raw.copy()
+    std = std.where(std > 0.5, 0.5)
+
+    z = (series - mean) / std
+    z = z.where(valid)
+    z = z.clip(-4.0, 4.0)
+    return z
 
 
 def ensure_series(obj, name: str) -> pd.Series:
@@ -434,23 +444,28 @@ buffett.name = "Buffett % GDP"
 
 # Track latest source dates
 ci_loans_weekly = ensure_series(ci_loans_weekly, "CI_Loans").asfreq("W-WED").ffill()
+weekly_index = ci_loans_weekly.index
 ci_loans_yoy_weekly = ci_loans_weekly.pct_change(52) * 100
 leverage_hist = ci_loans_weekly.resample("ME").last()
 leverage_yoy_hist = ensure_series(ci_loans_yoy_weekly, "CI_Loans_YoY").resample("ME").last()
 
 walcl_weekly = ensure_series(walcl, "FedBalanceSheet").asfreq("W-WED").ffill()
+walcl_weekly = walcl_weekly.reindex(weekly_index).ffill()
 walcl_yoy_weekly = walcl_weekly.pct_change(52) * 100
 walcl_hist = ensure_series(walcl_yoy_weekly, "FedBalanceSheet_YoY").resample("ME").last()
 
 rrp_daily = ensure_series(rrp, "RRP").sort_index()
-rrp_weekly = rrp_daily.resample("W-FRI").last().ffill()
+rrp_weekly = rrp_daily.resample("W-FRI").last()
+rrp_weekly = rrp_weekly.reindex(weekly_index, fill_value=0.0)
 rrp_yoy_weekly = rrp_weekly - rrp_weekly.shift(52)
 rrp_hist = ensure_series(rrp_yoy_weekly, "RRP_YoY").resample("ME").last()
 
 hy_series = ensure_series(hy_spread, "HY_Spread")
+hy_series = hy_series.reindex(wilshire.index, method="ffill").bfill()
 hy_hist = hy_series.resample("ME").mean()
 
 ig_series = ensure_series(ig_spread, "IG_Spread")
+ig_series = ig_series.reindex(wilshire.index, method="ffill").bfill()
 ig_hist = ig_series.resample("ME").mean()
 
 vix_series = ensure_series(vix, "VIX")
@@ -504,13 +519,34 @@ weights = (raw_weights / raw_weights.abs().sum() * weight_scale).to_dict()
 # === Historical composites ===
 # Align raw indicator series at month-end frequency
 buffett_hist = ensure_series(buffett, "Buffett")
-cape_hist = ensure_series(cape, "CAPE").resample("ME").last()
-m2_hist = ensure_series(m2_weekly, "M2").resample("ME").last()
-m2_yoy_hist = ensure_series(m2_yoy_weekly, "M2_YoY").resample("ME").last()
-vix_hist = ensure_series(vix, "VIX").resample("ME").last()
-sp_hist = ensure_series(sp500, "SP500").resample("ME").last()
-hy_hist = hy_hist
-leverage_yoy_hist = leverage_yoy_hist
+common_index = buffett_hist.index
+
+m_cape = ensure_series(cape, "CAPE").resample("ME").last()
+cape_hist = m_cape.reindex(common_index).ffill().bfill()
+m2_hist = (
+    ensure_series(m2_weekly, "M2").resample("ME").last().reindex(common_index).ffill().bfill()
+)
+m2_yoy_hist = (
+    ensure_series(m2_yoy_weekly, "M2_YoY")
+    .resample("ME")
+    .last()
+    .reindex(common_index)
+    .ffill()
+    .bfill()
+    .fillna(0.0)
+)
+vix_hist = (
+    ensure_series(vix, "VIX").resample("ME").last().reindex(common_index).ffill().bfill()
+)
+sp_hist = (
+    ensure_series(sp500, "SP500").resample("ME").last().reindex(common_index).ffill().bfill()
+)
+hy_hist = hy_hist.reindex(common_index).ffill().bfill()
+leverage_yoy_hist = leverage_yoy_hist.reindex(common_index).ffill().bfill().fillna(0.0)
+walcl_hist = walcl_hist.reindex(common_index).ffill().bfill().fillna(0.0)
+rrp_hist = rrp_hist.reindex(common_index).ffill().bfill().fillna(0.0)
+ig_hist = ig_hist.reindex(common_index).ffill().bfill()
+vol_term_hist = vol_term_hist.reindex(common_index).ffill().bfill().fillna(1.0)
 
 hist_df = pd.DataFrame(
     {
@@ -570,8 +606,16 @@ hist_df["SPX_Drawdown"] = hist_df["SP500"] / hist_df["SP500"].cummax() - 1.0
 signals_full, summary_full = build_validation_tables(hist_df)
 
 lag_map = {
-    "Buffett_ratio": 1,
-    "CAPE": 1,
+    "Buffett_ratio": 2,
+    "CAPE": 3,
+    "CI_Loans_YoY": 1,
+    "M2_YoY": 1,
+    "FedBalanceSheet_YoY": 1,
+    "RRP_YoY": 1,
+    "HY_Spread": 0,
+    "IG_Spread": 0,
+    "VIX": 0,
+    "VolTerm": 0,
 }
 realtime_series = compute_realtime_composite(hist_df, weights, lag_map=lag_map)
 hist_df["Composite_real_time"] = realtime_series
@@ -741,6 +785,26 @@ if not summary_rt.empty:
     print(summary_rt.round(3).to_string(index=False))
     print("\nValidation deltas (real-time minus full-information):")
     print(summary_comparison[["horizon_months", "hit_rate_full", "hit_rate_rt", "hit_rate_delta"]].round(3).to_string(index=False))
+
+alert_thresholds = {
+    "Observation": 0.6,
+    "Caution": 0.9,
+    "Euphoria": 1.2,
+    "Instability": 1.5,
+}
+print("\nAlert counts (full composite):")
+for label, threshold in alert_thresholds.items():
+    count = int((hist_df["Composite"] >= threshold).sum())
+    current = hist_df["Composite"].iloc[-1] >= threshold
+    print(f"  {label} (≥{threshold:.2f}): {count} hits | current={'YES' if current else 'no'}")
+
+if not hist_df["Composite_real_time"].dropna().empty:
+    print("\nAlert counts (pseudo real-time composite):")
+    for label, threshold in alert_thresholds.items():
+        series = hist_df["Composite_real_time"].dropna()
+        count = int((series >= threshold).sum())
+        current = series.iloc[-1] >= threshold if not series.empty else False
+        print(f"  {label} (≥{threshold:.2f}): {count} hits | current={'YES' if current else 'no'}")
 
 # Persist historical backtest
 history_cols = [

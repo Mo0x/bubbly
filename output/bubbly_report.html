@@ -1,6 +1,192 @@
-<table border="1" class="dataframe">
+
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>🍾 Bubbly Market Monitor</title>
+        <style>
+            :root {
+                color-scheme: dark;
+                font-family: 'Inter', 'Segoe UI', sans-serif;
+            }
+            body {
+                margin: 0;
+                padding: 0;
+                background: radial-gradient(circle at 20% 20%, rgba(255,255,255,0.08), transparent 40%),
+                            radial-gradient(circle at 80% 30%, rgba(255,255,255,0.05), transparent 45%),
+                            #0b0f16;
+                color: #f6f7fb;
+                min-height: 100vh;
+            }
+            header {
+                padding: 2.5rem 1.5rem 1.5rem;
+                text-align: center;
+                position: relative;
+            }
+            header::after {
+                content: '';
+                position: absolute;
+                inset: 0;
+                background: radial-gradient(circle, rgba(255,215,128,0.18) 0%, transparent 65%);
+                opacity: 0.6;
+                pointer-events: none;
+            }
+            .title {
+                font-size: clamp(2.5rem, 4vw, 3.2rem);
+                font-weight: 700;
+                letter-spacing: 0.08em;
+                margin-bottom: 0.35rem;
+                z-index: 1;
+                position: relative;
+            }
+            .subtitle {
+                font-size: 1rem;
+                color: rgba(255, 255, 255, 0.7);
+                letter-spacing: 0.18em;
+                text-transform: uppercase;
+                position: relative;
+                z-index: 1;
+            }
+            main {
+                max-width: 1100px;
+                margin: 0 auto;
+                padding: 0 1.5rem 4rem;
+            }
+            section {
+                background: rgba(12, 18, 30, 0.82);
+                border: 1px solid rgba(255, 255, 255, 0.05);
+                border-radius: 24px;
+                padding: 2rem;
+                margin-bottom: 2rem;
+                backdrop-filter: blur(14px);
+                box-shadow: 0 20px 45px rgba(5, 10, 22, 0.45);
+            }
+            h2 {
+                margin-top: 0;
+                font-size: 1.5rem;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+            }
+            .metrics {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                gap: 1rem;
+                margin-top: 1.5rem;
+            }
+            .metric-card {
+                background: linear-gradient(145deg, rgba(38, 52, 74, 0.9), rgba(14, 22, 34, 0.9));
+                border-radius: 18px;
+                padding: 1.2rem;
+                border: 1px solid rgba(255,255,255,0.08);
+                display: flex;
+                flex-direction: column;
+                gap: 0.35rem;
+            }
+            .metric-card .label {
+                font-size: 0.8rem;
+                text-transform: uppercase;
+                letter-spacing: 0.18em;
+                color: rgba(255, 255, 255, 0.6);
+            }
+            .metric-card .value {
+                font-size: 1.8rem;
+                font-weight: 600;
+                color: #ffd782;
+            }
+            .metric-card .meta {
+                font-size: 0.95rem;
+                color: rgba(255, 255, 255, 0.7);
+            }
+            .data-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 1.5rem;
+                border-radius: 12px;
+                overflow: hidden;
+                font-size: 0.95rem;
+            }
+            .data-table thead {
+                background: rgba(255, 215, 130, 0.12);
+                color: #ffd782;
+            }
+            .data-table tbody tr {
+                background: rgba(15, 22, 32, 0.65);
+            }
+            .data-table tbody tr:nth-child(even) {
+                background: rgba(20, 28, 42, 0.8);
+            }
+            .data-table th,
+            .data-table td {
+                padding: 0.75rem 1rem;
+                border: none;
+                text-align: center;
+            }
+            .data-table tbody tr:hover {
+                background: rgba(255, 215, 130, 0.16);
+                transition: background 0.2s ease-in-out;
+            }
+            .empty-note {
+                color: rgba(255, 255, 255, 0.6);
+                font-style: italic;
+                margin-top: 1rem;
+            }
+            .chart-wrapper {
+                text-align: center;
+                margin-top: 1.5rem;
+            }
+            .chart-wrapper img {
+                width: min(100%, 720px);
+                border-radius: 18px;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                box-shadow: 0 18px 35px rgba(0, 0, 0, 0.45);
+            }
+            footer {
+                text-align: center;
+                padding: 2rem 1rem;
+                color: rgba(255, 255, 255, 0.45);
+                font-size: 0.85rem;
+            }
+            a {
+                color: #ffd782;
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <div class="title">🍾 Bubbly Market Monitor</div>
+            <div class="subtitle">A whimsical watch on market froth</div>
+        </header>
+        <main>
+            <section>
+                <h2>Current Pulse</h2>
+                
+        <div class="metrics">
+            <div class="metric-card">
+                <span class="label">Composite Phase</span>
+                <span class="value">1.27</span>
+                <span class="meta">Euphoria</span>
+            </div>
+            <div class="metric-card">
+                <span class="label">Valuation Pressure</span>
+                <span class="value">1.19</span>
+            </div>
+            <div class="metric-card">
+                <span class="label">Liquidity Trigger</span>
+                <span class="value">0.63</span>
+            </div>
+            <div class="metric-card">
+                <span class="label">Data Coverage</span>
+                <span class="value">2025-09-30</span>
+            </div>
+        </div>
+    
+            </section>
+            <section>
+                <h2>Indicator Dashboard</h2>
+                <table class="dataframe data-table overview-table">
   <thead>
-    <tr style="text-align: right;">
+    <tr style="text-align: center;">
       <th></th>
       <th>Z-score</th>
       <th>Latest_value</th>
@@ -20,51 +206,138 @@
   <tbody>
     <tr>
       <th>Buffett_ratio</th>
-      <td>2.819465</td>
-      <td>217.258846</td>
+      <td>2.82</td>
+      <td>217.26</td>
       <td>0.30</td>
-      <td>0.845839</td>
+      <td>0.85</td>
       <td>2025-09-30</td>
     </tr>
     <tr>
       <th>CAPE</th>
-      <td>1.640712</td>
-      <td>38.851400</td>
+      <td>1.64</td>
+      <td>38.85</td>
       <td>0.30</td>
-      <td>0.492214</td>
+      <td>0.49</td>
       <td>2025-10-01</td>
     </tr>
     <tr>
       <th>CI_Loans_YoY</th>
-      <td>-0.887205</td>
-      <td>-2.972040</td>
+      <td>-0.89</td>
+      <td>-2.97</td>
       <td>0.20</td>
-      <td>-0.177441</td>
+      <td>-0.18</td>
       <td>2025-09-30</td>
     </tr>
     <tr>
       <th>M2_YoY</th>
-      <td>-0.383759</td>
-      <td>4.660038</td>
+      <td>-0.38</td>
+      <td>4.66</td>
       <td>-0.10</td>
-      <td>0.038376</td>
+      <td>0.04</td>
       <td>2025-09-01</td>
     </tr>
     <tr>
       <th>VIX</th>
-      <td>-0.530773</td>
-      <td>16.280001</td>
+      <td>-0.53</td>
+      <td>16.28</td>
       <td>-0.05</td>
-      <td>0.026539</td>
+      <td>0.03</td>
       <td>2025-10-24</td>
     </tr>
     <tr>
       <th>HY_Spread</th>
-      <td>-0.964545</td>
-      <td>2.788182</td>
+      <td>-0.96</td>
+      <td>2.79</td>
       <td>-0.05</td>
-      <td>0.048227</td>
+      <td>0.05</td>
       <td>2025-10-23</td>
     </tr>
   </tbody>
 </table>
+            </section>
+            <section>
+                <h2>Historical Backdrop</h2>
+                <div class="chart-wrapper">
+                    <img src="bubbly_backtest.png" alt="Composite vs S&amp;P 500 drawdown" />
+                </div>
+            </section>
+            <section>
+                <h2>Validation Signals</h2>
+                <table class="dataframe data-table validation-table">
+  <thead>
+    <tr style="text-align: center;">
+      <th>horizon_months</th>
+      <th>signals</th>
+      <th>hits</th>
+      <th>hit_rate</th>
+      <th>avg_hit_lead_months</th>
+      <th>median_drawdown</th>
+      <th>worst_drawdown</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>6</td>
+      <td>25</td>
+      <td>1</td>
+      <td>0.040</td>
+      <td>6.000</td>
+      <td>-0.048</td>
+      <td>-0.206</td>
+    </tr>
+    <tr>
+      <td>12</td>
+      <td>25</td>
+      <td>5</td>
+      <td>0.200</td>
+      <td>8.000</td>
+      <td>-0.053</td>
+      <td>-0.248</td>
+    </tr>
+  </tbody>
+</table>
+            </section>
+            <section>
+                <h2>Data Freshness</h2>
+                <table class="dataframe data-table sources-table">
+  <thead>
+    <tr style="text-align: center;">
+      <th>Indicator</th>
+      <th>Last Update</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>M2_YoY</td>
+      <td>2025-09-01</td>
+    </tr>
+    <tr>
+      <td>Buffett_ratio</td>
+      <td>2025-09-30</td>
+    </tr>
+    <tr>
+      <td>CI_Loans_YoY</td>
+      <td>2025-09-30</td>
+    </tr>
+    <tr>
+      <td>CAPE</td>
+      <td>2025-10-01</td>
+    </tr>
+    <tr>
+      <td>HY_Spread</td>
+      <td>2025-10-23</td>
+    </tr>
+    <tr>
+      <td>VIX</td>
+      <td>2025-10-24</td>
+    </tr>
+  </tbody>
+</table>
+            </section>
+        </main>
+        <footer>
+            Crafted with bubbles and benchmarks · 2025-10-26 15:41 UTC
+        </footer>
+    </body>
+    </html>
+    

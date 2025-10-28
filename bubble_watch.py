@@ -198,12 +198,13 @@ def compute_weekly_m2_yoy() -> tuple[pd.Series, pd.Series]:
 
 def build_validation_tables(
     hist_df: pd.DataFrame,
+    composite_column: str = "Composite",
     horizons: tuple[int, ...] = (6, 12),
     threshold: float = -0.15,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Evaluate forward drawdowns after composite breaches."""
     records = []
-    composite = hist_df["Composite"]
+    composite = hist_df[composite_column]
     prices = hist_df["SP500"]
 
     for idx in range(len(hist_df)):
@@ -272,6 +273,46 @@ def build_validation_tables(
 
     summary_df = pd.DataFrame(summary_rows)
     return signals_df, summary_df
+
+
+def compute_realtime_composite(
+    hist_df: pd.DataFrame,
+    weights: dict[str, float],
+    lag_map: dict[str, int] | None = None,
+    min_history: int = 12,
+) -> pd.Series:
+    """Approximate real-time composite using only data available at each month."""
+    if lag_map is None:
+        lag_map = {}
+
+    series_map = {
+        "Buffett_ratio": "Buffett",
+        "CAPE": "CAPE",
+        "CI_Loans_YoY": "CI_Loans_YoY",
+        "M2_YoY": "M2_YoY",
+        "FedBalanceSheet_YoY": "FedBalanceSheet_YoY",
+        "RRP_YoY": "RRP_YoY",
+        "HY_Spread": "HY_Spread",
+        "IG_Spread": "IG_Spread",
+        "VIX": "VIX",
+        "VolTerm": "VolTerm",
+    }
+
+    realtime_values = []
+    for idx, date in enumerate(hist_df.index):
+        total = 0.0
+        valid = True
+        for key, col in series_map.items():
+            lag = lag_map.get(key, 0)
+            series = hist_df[col].shift(lag).iloc[: idx + 1].dropna()
+            if len(series) < min_history:
+                valid = False
+                break
+            z = expanding_zscore(series).iloc[-1]
+            total += weights[key] * z
+        realtime_values.append(total if valid else float("nan"))
+
+    return pd.Series(realtime_values, index=hist_df.index, name="Composite_real_time")
 
 
 def fetch_shiller_local_xls(path="data/ie_data.xls") -> pd.Series:
@@ -442,18 +483,22 @@ source_dates = {
     "VolTerm": vol_term_daily.index.max() if not vol_term_daily.empty else pd.NaT,
 }
 
-weights = {
-    "Buffett_ratio": 0.22,
-    "CAPE": 0.22,
-    "CI_Loans_YoY": 0.15,
-    "M2_YoY": -0.1,
-    "FedBalanceSheet_YoY": -0.08,
-    "RRP_YoY": 0.05,
-    "HY_Spread": 0.12,
-    "IG_Spread": 0.06,
-    "VIX": -0.07,
-    "VolTerm": 0.13,
-}
+raw_weights = pd.Series(
+    {
+        "Buffett_ratio": 0.30,
+        "CAPE": 0.30,
+        "CI_Loans_YoY": 0.22,
+        "M2_YoY": -0.25,
+        "FedBalanceSheet_YoY": -0.20,
+        "RRP_YoY": 0.15,
+        "HY_Spread": 0.24,
+        "IG_Spread": 0.12,
+        "VIX": -0.18,
+        "VolTerm": 0.24,
+    }
+)
+weight_scale = 2.0
+weights = (raw_weights / raw_weights.abs().sum() * weight_scale).to_dict()
 
 
 # === Historical composites ===
@@ -522,7 +567,30 @@ hist_df["Composite"] = (
 )
 hist_df["SPX_Drawdown"] = hist_df["SP500"] / hist_df["SP500"].cummax() - 1.0
 
-signals_df, summary_df = build_validation_tables(hist_df)
+signals_full, summary_full = build_validation_tables(hist_df)
+
+lag_map = {
+    "Buffett_ratio": 1,
+    "CAPE": 1,
+}
+realtime_series = compute_realtime_composite(hist_df, weights, lag_map=lag_map)
+hist_df["Composite_real_time"] = realtime_series
+signals_rt, summary_rt = build_validation_tables(
+    hist_df.dropna(subset=["Composite_real_time"]), composite_column="Composite_real_time"
+)
+
+summary_comparison = summary_full.merge(
+    summary_rt,
+    on="horizon_months",
+    how="outer",
+    suffixes=("_full", "_rt"),
+)
+summary_comparison["hit_rate_delta"] = (
+    summary_comparison["hit_rate_rt"] - summary_comparison["hit_rate_full"]
+)
+summary_comparison["median_drawdown_delta"] = (
+    summary_comparison["median_drawdown_rt"] - summary_comparison["median_drawdown_full"]
+)
 
 # === Latest snapshot ===
 buffett_z = float(hist_df["Buffett_z"].iloc[-1])
@@ -662,11 +730,17 @@ for name in [
         f" contribution={df.loc[name, 'Contribution']:.2f}"
     )
 
-if summary_df.empty:
+if summary_full.empty:
     print("\nNo composite signals above threshold available for validation yet.")
 else:
     print("\nForward drawdown validation (Composite > 1, drawdown ≤ -15%):")
-    print(summary_df.round(3).to_string(index=False))
+    print(summary_full.round(3).to_string(index=False))
+
+if not summary_rt.empty:
+    print("\nPseudo real-time validation (lagged inputs, same threshold):")
+    print(summary_rt.round(3).to_string(index=False))
+    print("\nValidation deltas (real-time minus full-information):")
+    print(summary_comparison[["horizon_months", "hit_rate_full", "hit_rate_rt", "hit_rate_delta"]].round(3).to_string(index=False))
 
 # Persist historical backtest
 history_cols = [
@@ -691,13 +765,17 @@ history_cols = [
     "IG_Spread_z",
     "VolTerm_z",
     "Composite",
+    "Composite_real_time",
     "SP500",
     "SPX_Drawdown",
 ]
 os.makedirs("output", exist_ok=True)
 hist_df[history_cols].to_csv("output/bubbly_history.csv", float_format="%.4f")
-signals_df.to_csv("output/bubbly_validation_signals.csv", index=False)
-summary_df.to_csv("output/bubbly_validation_summary.csv", index=False)
+signals_full.to_csv("output/bubbly_validation_signals_full.csv", index=False)
+summary_full.to_csv("output/bubbly_validation_summary.csv", index=False)
+signals_rt.to_csv("output/bubbly_validation_signals_realtime.csv", index=False)
+summary_rt.to_csv("output/bubbly_validation_summary_realtime.csv", index=False)
+summary_comparison.to_csv("output/bubbly_validation_summary_comparison.csv", index=False)
 
 # Plot composite vs SPX drawdown
 fig, ax1 = plt.subplots(figsize=(11, 6))
@@ -728,12 +806,41 @@ fig.tight_layout()
 plt.savefig("output/bubbly_backtest.png", dpi=200)
 plt.close(fig)
 
+fig, ax = plt.subplots(figsize=(11, 6))
+ax.plot(hist_df.index, hist_df["Composite"], label="Composite (full)", color="tab:blue")
+ax.plot(
+    hist_df.index,
+    hist_df["Composite_real_time"],
+    label="Composite (pseudo real-time)",
+    color="tab:orange",
+    linewidth=1.0,
+)
+ax2 = ax.twinx()
+ax2.fill_between(
+    hist_df.index,
+    hist_df["SPX_Drawdown"],
+    0,
+    color="tab:red",
+    alpha=0.25,
+    label="SPX Drawdown",
+)
+ax.set_ylabel("Composite Z-score")
+ax.set_xlabel("Date")
+ax.set_title("Bubbly Composite: Full vs. Pseudo Real-time")
+ax.legend(loc="upper left")
+ax2.set_ylabel("SPX Drawdown")
+ax2.set_ylim(-0.8, 0.05)
+fig.tight_layout()
+plt.savefig("output/bubbly_realtime_backtest.png", dpi=200)
+plt.close(fig)
+
 print("Historical series saved to output/bubbly_history.csv")
 print("Backtest chart saved to output/bubbly_backtest.png")
+print("Real-time comparison chart saved to output/bubbly_realtime_backtest.png")
 
 report_path = save_html_report(
     overview_df=df,
-    validation_summary=summary_df,
+    validation_summary=summary_full,
     source_dates=source_dates,
     composite_value=comp,
     phase=phase,

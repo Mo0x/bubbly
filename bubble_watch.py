@@ -169,6 +169,24 @@ def extend_gdp_with_nowcast(gdp: pd.Series, gdpnow: pd.Series) -> pd.Series:
     return pd.concat([gdp, extension])
 
 
+def monthly_gdp_with_proxy(gdp: pd.Series, proxy: pd.Series) -> pd.Series:
+    """Blend quarterly GDP into monthly using a high-frequency activity proxy."""
+    gdp = ensure_series(gdp, "GDP").sort_index()
+    gdp_q = gdp.copy()
+    gdp_q.index = gdp_q.index + pd.offsets.QuarterEnd(0)
+    gdp_m = gdp_q.resample("ME").ffill()
+
+    proxy = ensure_series(proxy, "ActivityProxy").sort_index()
+    proxy_m = proxy.resample("ME").last().ffill()
+    proxy_quarter_avg = proxy_m.groupby(proxy_m.index.to_period("Q")).transform("mean")
+    adj = (proxy_m / proxy_quarter_avg).replace([np.inf, -np.inf], np.nan).fillna(1.0)
+    adj = adj.reindex(gdp_m.index).ffill().fillna(1.0)
+
+    blended = gdp_m * adj
+    blended.name = "GDP"
+    return blended
+
+
 def compute_weekly_m2_yoy() -> tuple[pd.Series, pd.Series]:
     """Return weekly M2 levels and YoY % derived from WM2NS."""
     m2_weekly = ensure_series(fetch_fred("WM2NS"), "M2")
@@ -307,6 +325,20 @@ def fetch_shiller_local_xls(path="data/ie_data.xls") -> pd.Series:
 
     return s
 
+
+def fetch_cape_series(local_path="data/ie_data.xls") -> pd.Series:
+    """Load CAPE from FRED when possible, otherwise fall back to local Shiller file."""
+    try:
+        cape = fetch_fred("CAPE")
+        cape = ensure_series(cape, "CAPE")
+        cape.index = pd.to_datetime(cape.index)
+        cape = cape.sort_index()
+        cape = cape[cape.index >= cape.index.max() - pd.DateOffset(years=60)]
+        return cape
+    except Exception:
+        return fetch_shiller_local_xls(local_path)
+
+
 def latest_float(series: pd.Series) -> float:
     s = series.dropna()
     val = s.iloc[-1]
@@ -320,12 +352,17 @@ print("Fetching data ...")
 
 gdp = extend_gdp_with_nowcast(fetch_fred("GDP", freq="q"), fetch_fred("GDPNOW", freq="q"))
 m2_weekly, m2_yoy_weekly = compute_weekly_m2_yoy()
-ci_loans = fetch_fred("BUSLOANS")
+ci_loans_weekly = fetch_fred("TOTCI")
 hy_spread = fetch_fred("BAMLH0A0HYM2")
+walcl = fetch_fred("WALCL")
+rrp = fetch_fred("RRPONTSYAWARD")
+ig_spread = fetch_fred("BAA10Y")
+indpro = fetch_fred("INDPRO")
 wilshire = fetch_yahoo("^W5000")
 sp500 = fetch_yahoo("^GSPC")
 vix = fetch_yahoo("^VIX")
-cape = fetch_shiller_local_xls("data/ie_data.xls")
+vxv = fetch_yahoo("^VIX3M")
+cape = fetch_cape_series("data/ie_data.xls")
 
 # === Compute Buffett ratio proxy ===
 # --- Buffett ratio (SP500 / GDP * 100) ---
@@ -342,9 +379,7 @@ sp500 = ensure_series(sp500, "SP500")
 gdp = ensure_series(gdp, "GDP")
 
 # Resample both to month-end frequency
-gdp_q = gdp.copy()
-gdp_q.index = gdp_q.index + pd.offsets.QuarterEnd(0)
-gdp_m = gdp_q.resample("ME").ffill()
+gdp_m = monthly_gdp_with_proxy(gdp, indpro)
 wilshire_m = wilshire.resample("ME").last()
 sp_m = sp500.resample("ME").last()
 
@@ -357,27 +392,69 @@ buffett = buffett.dropna()
 buffett.name = "Buffett % GDP"
 
 # Track latest source dates
-leverage_hist = ensure_series(ci_loans, "CI_Loans").resample("ME").last()
-leverage_yoy_hist = leverage_hist.pct_change(12) * 100
-hy_hist = ensure_series(hy_spread, "HY_Spread").resample("ME").mean()
+ci_loans_weekly = ensure_series(ci_loans_weekly, "CI_Loans").asfreq("W-WED").ffill()
+ci_loans_yoy_weekly = ci_loans_weekly.pct_change(52) * 100
+leverage_hist = ci_loans_weekly.resample("ME").last()
+leverage_yoy_hist = ensure_series(ci_loans_yoy_weekly, "CI_Loans_YoY").resample("ME").last()
+
+walcl_weekly = ensure_series(walcl, "FedBalanceSheet").asfreq("W-WED").ffill()
+walcl_yoy_weekly = walcl_weekly.pct_change(52) * 100
+walcl_hist = ensure_series(walcl_yoy_weekly, "FedBalanceSheet_YoY").resample("ME").last()
+
+rrp_daily = ensure_series(rrp, "RRP").sort_index()
+rrp_weekly = rrp_daily.resample("W-FRI").last().ffill()
+rrp_yoy_weekly = rrp_weekly - rrp_weekly.shift(52)
+rrp_hist = ensure_series(rrp_yoy_weekly, "RRP_YoY").resample("ME").last()
+
+hy_series = ensure_series(hy_spread, "HY_Spread")
+hy_hist = hy_series.resample("ME").mean()
+
+ig_series = ensure_series(ig_spread, "IG_Spread")
+ig_hist = ig_series.resample("ME").mean()
+
+vix_series = ensure_series(vix, "VIX")
+try:
+    vxv_series = ensure_series(vxv, "VXV")
+    vol_term_daily = pd.concat([vix_series, vxv_series], axis=1, join="inner").rename(
+        columns={"VIX": "VIX", "VXV": "VXV"}
+    )
+    vol_term_daily = (vol_term_daily["VIX"] / vol_term_daily["VXV"]).rename("VolTerm")
+    vol_term_daily = vol_term_daily.replace([np.inf, -np.inf], np.nan)
+except Exception:
+    vol_term_daily = pd.Series(dtype=float, name="VolTerm")
+
+if vol_term_daily.empty:
+    vol_term_hist = vix_series.resample("ME").last().apply(lambda _: 1.0)
+    vol_term_hist.name = "VolTerm"
+else:
+    vol_term_hist = ensure_series(vol_term_daily, "VolTerm").resample("ME").mean()
 
 source_dates = {
     "Buffett_ratio": buffett.index.max(),
     "CAPE": cape.index.max(),
     "CI_Loans_YoY": leverage_yoy_hist.dropna().index.max(),
     "M2_YoY": m2_yoy_weekly.dropna().index.max(),
-    "VIX": vix.index.max(),
-    "HY_Spread": ensure_series(hy_spread, "HY_Spread").index.max(),
+    "FedBalanceSheet_YoY": walcl_yoy_weekly.dropna().index.max(),
+    "RRP_YoY": rrp_yoy_weekly.dropna().index.max(),
+    "HY_Spread": hy_series.index.max(),
+    "IG_Spread": ig_series.index.max(),
+    "VIX": vix_series.index.max(),
+    "VolTerm": vol_term_daily.index.max() if not vol_term_daily.empty else pd.NaT,
 }
 
 weights = {
-    "Buffett_ratio": 0.3,
-    "CAPE": 0.3,
-    "CI_Loans_YoY": 0.2,
+    "Buffett_ratio": 0.22,
+    "CAPE": 0.22,
+    "CI_Loans_YoY": 0.15,
     "M2_YoY": -0.1,
-    "VIX": -0.05,
-    "HY_Spread": -0.05,
+    "FedBalanceSheet_YoY": -0.08,
+    "RRP_YoY": 0.05,
+    "HY_Spread": 0.12,
+    "IG_Spread": 0.06,
+    "VIX": -0.07,
+    "VolTerm": 0.13,
 }
+
 
 # === Historical composites ===
 # Align raw indicator series at month-end frequency
@@ -398,6 +475,10 @@ hist_df = pd.DataFrame(
         "VIX": vix_hist,
         "CI_Loans_YoY": leverage_yoy_hist,
         "HY_Spread": hy_hist,
+        "FedBalanceSheet_YoY": walcl_hist,
+        "RRP_YoY": rrp_hist,
+        "IG_Spread": ig_hist,
+        "VolTerm": vol_term_hist,
         "SP500": sp_hist,
     }
 ).dropna()
@@ -408,6 +489,10 @@ hist_df["M2_YoY_z"] = expanding_zscore(hist_df["M2_YoY"])
 hist_df["VIX_z"] = expanding_zscore(hist_df["VIX"])
 hist_df["CI_Loans_z"] = expanding_zscore(hist_df["CI_Loans_YoY"])
 hist_df["HY_Spread_z"] = expanding_zscore(hist_df["HY_Spread"])
+hist_df["FedBalanceSheet_z"] = expanding_zscore(hist_df["FedBalanceSheet_YoY"])
+hist_df["RRP_z"] = expanding_zscore(hist_df["RRP_YoY"])
+hist_df["IG_Spread_z"] = expanding_zscore(hist_df["IG_Spread"])
+hist_df["VolTerm_z"] = expanding_zscore(hist_df["VolTerm"])
 hist_df = hist_df.dropna(
     subset=[
         "Buffett_z",
@@ -416,6 +501,10 @@ hist_df = hist_df.dropna(
         "VIX_z",
         "CI_Loans_z",
         "HY_Spread_z",
+        "FedBalanceSheet_z",
+        "RRP_z",
+        "IG_Spread_z",
+        "VolTerm_z",
     ]
 )
 
@@ -424,8 +513,12 @@ hist_df["Composite"] = (
     + weights["CAPE"] * hist_df["CAPE_z"]
     + weights["CI_Loans_YoY"] * hist_df["CI_Loans_z"]
     + weights["M2_YoY"] * hist_df["M2_YoY_z"]
+    + weights["FedBalanceSheet_YoY"] * hist_df["FedBalanceSheet_z"]
+    + weights["RRP_YoY"] * hist_df["RRP_z"]
     + weights["VIX"] * hist_df["VIX_z"]
+    + weights["VolTerm"] * hist_df["VolTerm_z"]
     + weights["HY_Spread"] * hist_df["HY_Spread_z"]
+    + weights["IG_Spread"] * hist_df["IG_Spread_z"]
 )
 hist_df["SPX_Drawdown"] = hist_df["SP500"] / hist_df["SP500"].cummax() - 1.0
 
@@ -438,6 +531,10 @@ m2_z = float(hist_df["M2_YoY_z"].iloc[-1])
 vix_z = float(hist_df["VIX_z"].iloc[-1])
 leverage_z = float(hist_df["CI_Loans_z"].iloc[-1])
 hy_z = float(hist_df["HY_Spread_z"].iloc[-1])
+fed_z = float(hist_df["FedBalanceSheet_z"].iloc[-1])
+rrp_z = float(hist_df["RRP_z"].iloc[-1])
+ig_z = float(hist_df["IG_Spread_z"].iloc[-1])
+volterm_z = float(hist_df["VolTerm_z"].iloc[-1])
 
 buffett_latest = float(hist_df["Buffett"].iloc[-1])
 cape_latest = float(hist_df["CAPE"].iloc[-1])
@@ -445,6 +542,10 @@ m2_latest = float(hist_df["M2_YoY"].iloc[-1])
 vix_latest = float(hist_df["VIX"].iloc[-1])
 leverage_latest = float(hist_df["CI_Loans_YoY"].iloc[-1])
 hy_latest = float(hist_df["HY_Spread"].iloc[-1])
+fed_latest = float(hist_df["FedBalanceSheet_YoY"].iloc[-1])
+rrp_latest = float(hist_df["RRP_YoY"].iloc[-1])
+ig_latest = float(hist_df["IG_Spread"].iloc[-1])
+volterm_latest = float(hist_df["VolTerm"].iloc[-1])
 
 composite_last_date = hist_df.index[-1]
 
@@ -457,7 +558,11 @@ df = pd.DataFrame(
             "CI_Loans_YoY",
             "M2_YoY",
             "VIX",
+            "FedBalanceSheet_YoY",
+            "RRP_YoY",
             "HY_Spread",
+            "IG_Spread",
+            "VolTerm",
         ],
         "Z-score": [
             buffett_z,
@@ -465,7 +570,11 @@ df = pd.DataFrame(
             leverage_z,
             m2_z,
             vix_z,
+            fed_z,
+            rrp_z,
             hy_z,
+            ig_z,
+            volterm_z,
         ],
         "Latest_value": [
             buffett_latest,
@@ -473,7 +582,11 @@ df = pd.DataFrame(
             leverage_latest,
             m2_latest,
             vix_latest,
+            fed_latest,
+            rrp_latest,
             hy_latest,
+            ig_latest,
+            volterm_latest,
         ],
     }
 ).set_index("indicator")
@@ -508,8 +621,12 @@ trigger = float(
     np.mean(
         [
             -hist_df["M2_YoY_z"].iloc[-1],
+            -hist_df["FedBalanceSheet_z"].iloc[-1],
+            hist_df["RRP_z"].iloc[-1],
+            hist_df["HY_Spread_z"].iloc[-1],
+            hist_df["IG_Spread_z"].iloc[-1],
+            hist_df["VolTerm_z"].iloc[-1],
             -hist_df["VIX_z"].iloc[-1],
-            -hist_df["HY_Spread_z"].iloc[-1],
         ]
     )
 )
@@ -528,7 +645,18 @@ for name, ts in sorted(source_dates.items(), key=lambda kv: kv[1]):
     stamp = ts.date().isoformat() if pd.notna(ts) else "N/A"
     print(f"  {name}: {stamp}")
 print("\nDebug check:")
-for name in ["Buffett_ratio", "CAPE", "CI_Loans_YoY", "M2_YoY", "VIX", "HY_Spread"]:
+for name in [
+    "Buffett_ratio",
+    "CAPE",
+    "CI_Loans_YoY",
+    "M2_YoY",
+    "FedBalanceSheet_YoY",
+    "RRP_YoY",
+    "HY_Spread",
+    "IG_Spread",
+    "VIX",
+    "VolTerm",
+]:
     print(
         f"{name} z={df.loc[name, 'Z-score']:.2f} weight={df.loc[name, 'Weight']:.2f}"
         f" contribution={df.loc[name, 'Contribution']:.2f}"
@@ -547,13 +675,21 @@ history_cols = [
     "M2_YoY",
     "VIX",
     "CI_Loans_YoY",
+    "FedBalanceSheet_YoY",
+    "RRP_YoY",
     "HY_Spread",
+    "IG_Spread",
+    "VolTerm",
     "Buffett_z",
     "CAPE_z",
     "M2_YoY_z",
     "VIX_z",
     "CI_Loans_z",
+    "FedBalanceSheet_z",
+    "RRP_z",
     "HY_Spread_z",
+    "IG_Spread_z",
+    "VolTerm_z",
     "Composite",
     "SP500",
     "SPX_Drawdown",

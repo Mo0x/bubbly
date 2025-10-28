@@ -1,0 +1,1 @@
+Consider swapping the C&I proxy for true FINRA margin debt via their authenticated API when you’re ready; the plumbing is in place to drop in a higher fidelity leverage feed.

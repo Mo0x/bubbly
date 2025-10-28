@@ -15,6 +15,9 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 from pandas_datareader import data as pdr
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+from plotly.offline import plot as plotly_plot
 
 from html_report import save_html_report
 
@@ -321,8 +324,271 @@ def compute_realtime_composite(
             z = expanding_zscore(series).iloc[-1]
             total += weights[key] * z
         realtime_values.append(total if valid else float("nan"))
-
+    if len(realtime_values) != len(hist_df.index):
+        raise RuntimeError(
+            f"Real-time composite length mismatch: values={len(realtime_values)} index={len(hist_df.index)}"
+        )
     return pd.Series(realtime_values, index=hist_df.index, name="Composite_real_time")
+
+
+def build_plotly_dashboard(
+    hist_df: pd.DataFrame,
+    event_dates: list[pd.Timestamp],
+    output_path: str | Path,
+) -> Path:
+    """Create an interactive Plotly dashboard and write it to disk."""
+    composite = hist_df["Composite"]
+    realtime = hist_df["Composite_real_time"]
+    pressure_z = hist_df["Pressure_z"]
+    trigger_z = hist_df["Trigger_z"]
+    pressure_raw = hist_df["Pressure_raw"]
+    trigger_raw = hist_df["Trigger_raw"]
+    drawdown = hist_df["SPX_Drawdown"]
+
+    fig = make_subplots(
+        rows=3,
+        cols=1,
+        shared_xaxes=True,
+        vertical_spacing=0.06,
+        row_heights=[0.45, 0.30, 0.25],
+    )
+
+    # Regime shading on composite panel
+    x_start = composite.index.min()
+    x_end = composite.index.max()
+    regime_shapes = [
+        {
+            "type": "rect",
+            "xref": "x1",
+            "yref": "y1",
+            "x0": x_start,
+            "x1": x_end,
+            "y0": -4,
+            "y1": 1,
+            "fillcolor": "rgba(46, 125, 50, 0.18)",
+            "line": {"width": 0},
+            "layer": "below",
+        },
+        {
+            "type": "rect",
+            "xref": "x1",
+            "yref": "y1",
+            "x0": x_start,
+            "x1": x_end,
+            "y0": 1,
+            "y1": 2,
+            "fillcolor": "rgba(249, 199, 79, 0.18)",
+            "line": {"width": 0},
+            "layer": "below",
+        },
+        {
+            "type": "rect",
+            "xref": "x1",
+            "yref": "y1",
+            "x0": x_start,
+            "x1": x_end,
+            "y0": 2,
+            "y1": 4,
+            "fillcolor": "rgba(239, 35, 60, 0.18)",
+            "line": {"width": 0},
+            "layer": "below",
+        },
+    ]
+
+    fig.add_trace(
+        go.Scatter(
+            x=composite.index,
+            y=composite,
+            name="Composite (z)",
+            line=dict(color="#1f77b4", width=2),
+            hovertemplate="Composite (z): %{y:.2f}<extra></extra>",
+        ),
+        row=1,
+        col=1,
+    )
+
+    if realtime.notna().any():
+        fig.add_trace(
+            go.Scatter(
+                x=realtime.index,
+                y=realtime,
+                name="Composite pseudo real-time",
+                line=dict(color="#ff7f0e", width=1.5, dash="dash"),
+                hovertemplate="Composite RT (z): %{y:.2f}<extra></extra>",
+            ),
+            row=1,
+            col=1,
+        )
+    else:
+        fig.add_trace(go.Scatter(x=[], y=[], showlegend=False), row=1, col=1)
+
+    if event_dates:
+        event_points = hist_df.loc[hist_df.index.isin(event_dates)]
+        fig.add_trace(
+            go.Scatter(
+                x=event_points.index,
+                y=event_points["Composite"],
+                mode="markers",
+                name="Signal → drawdown hit",
+                marker=dict(color="#ef233c", size=8, symbol="x"),
+                hovertemplate="Event: %{x|%Y-%m}<br>Composite: %{y:.2f}<extra></extra>",
+            ),
+            row=1,
+            col=1,
+        )
+    else:
+        fig.add_trace(go.Scatter(x=[], y=[], showlegend=False), row=1, col=1)
+
+    # Pressure/Trigger traces (z scores)
+    fig.add_trace(
+        go.Scatter(
+            x=pressure_z.index,
+            y=pressure_z,
+            name="Pressure (z)",
+            line=dict(color="#264653", width=2),
+            hovertemplate="Pressure (z): %{y:.2f}<br>Raw: %{customdata[0]:.2f}<extra></extra>",
+            customdata=np.column_stack([pressure_raw]),
+            visible=True,
+        ),
+        row=2,
+        col=1,
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=trigger_z.index,
+            y=trigger_z,
+            name="Trigger (z)",
+            line=dict(color="#e76f51", width=2),
+            hovertemplate="Trigger (z): %{y:.2f}<br>Raw: %{customdata[0]:.2f}<extra></extra>",
+            customdata=np.column_stack([trigger_raw]),
+            visible=True,
+        ),
+        row=2,
+        col=1,
+    )
+
+    # Raw traces (initially hidden)
+    fig.add_trace(
+        go.Scatter(
+            x=pressure_raw.index,
+            y=pressure_raw,
+            name="Pressure (raw)",
+            line=dict(color="#264653", width=2, dash="dot"),
+            hovertemplate="Pressure (raw): %{y:.2f}<br>Z-score: %{customdata[0]:.2f}<extra></extra>",
+            customdata=np.column_stack([pressure_z]),
+            visible=False,
+        ),
+        row=2,
+        col=1,
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=trigger_raw.index,
+            y=trigger_raw,
+            name="Trigger (raw)",
+            line=dict(color="#e76f51", width=2, dash="dot"),
+            hovertemplate="Trigger (raw): %{y:.2f}<br>Z-score: %{customdata[0]:.2f}<extra></extra>",
+            customdata=np.column_stack([trigger_z]),
+            visible=False,
+        ),
+        row=2,
+        col=1,
+    )
+
+    # Drawdown area
+    fig.add_trace(
+        go.Scatter(
+            x=drawdown.index,
+            y=drawdown,
+            name="S&P Drawdown",
+            fill="tozeroy",
+            line=dict(color="rgba(214, 39, 40, 0.7)", width=1.5),
+            fillcolor="rgba(214, 39, 40, 0.3)",
+            hovertemplate="Drawdown: %{y:.2%}<extra></extra>",
+        ),
+        row=3,
+        col=1,
+    )
+
+    vis_z = [True, True, bool(event_dates), True, True, False, False, True]
+    vis_raw = [True, True, bool(event_dates), False, False, True, True, True]
+
+    updatemenus = [
+        dict(
+            type="buttons",
+            direction="right",
+            x=0,
+            y=1.18,
+            xanchor="left",
+            buttons=[
+                dict(
+                    label="Z-score",
+                    method="update",
+                    args=[
+                        {"visible": vis_z},
+                        {"yaxis2": {"title": "Pressure / Trigger (z-score)"}},
+                    ],
+                ),
+                dict(
+                    label="Raw",
+                    method="update",
+                    args=[
+                        {"visible": vis_raw},
+                        {"yaxis2": {"title": "Pressure / Trigger (raw units)"}},
+                    ],
+                ),
+            ],
+        )
+    ]
+
+    fig.update_layout(
+        template="plotly_dark",
+        height=900,
+        margin=dict(l=70, r=40, t=80, b=50),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        hovermode="x unified",
+        updatemenus=updatemenus,
+        shapes=regime_shapes,
+    )
+
+    fig.update_xaxes(title_text="Date", row=3, col=1)
+    fig.update_yaxes(title_text="Composite (z)", row=1, col=1)
+    fig.update_yaxes(title_text="Pressure / Trigger (z-score)", row=2, col=1)
+    fig.update_yaxes(
+        title_text="S&P 500 Drawdown",
+        row=3,
+        col=1,
+        tickformat=".0%",
+        range=[min(drawdown.min() * 1.1, -1.0), 0.05],
+    )
+
+    # Threshold lines
+    for thresh in [1, 2]:
+        fig.add_hline(
+            y=thresh,
+            line=dict(color="rgba(255,255,255,0.25)", width=1, dash="dot"),
+            row=1,
+            col=1,
+        )
+    fig.add_hline(
+        y=-0.15,
+        line=dict(color="rgba(255,255,255,0.3)", width=1, dash="dash"),
+        row=3,
+        col=1,
+    )
+
+    output_path = Path(output_path)
+    plotly_plot(
+        fig,
+        filename=str(output_path),
+        auto_open=False,
+        config={
+            "displaylogo": False,
+            "responsive": True,
+            "toImageButtonOptions": {"format": "png", "filename": "bubbly_dashboard", "scale": 2},
+        },
+    )
+    return output_path
 
 
 def fetch_shiller_local_xls(path="data/ie_data.xls") -> pd.Series:
@@ -589,6 +855,36 @@ hist_df = hist_df.dropna(
     ]
 )
 
+pressure_series = hist_df[["Buffett_z", "CAPE_z", "CI_Loans_z"]].mean(axis=1)
+trigger_components = pd.DataFrame(
+    {
+        "M2": -hist_df["M2_YoY_z"],
+        "FedBalanceSheet": -hist_df["FedBalanceSheet_z"],
+        "RRP": hist_df["RRP_z"],
+        "HY": hist_df["HY_Spread_z"],
+        "IG": hist_df["IG_Spread_z"],
+        "VolTerm": hist_df["VolTerm_z"],
+        "VIX": -hist_df["VIX_z"],
+    }
+)
+trigger_series = trigger_components.mean(axis=1)
+
+pressure_raw = hist_df[["Buffett", "CAPE", "CI_Loans_YoY"]].mean(axis=1)
+trigger_raw = (
+    -hist_df["M2_YoY"]
+    - hist_df["FedBalanceSheet_YoY"]
+    + hist_df["RRP_YoY"]
+    + hist_df["HY_Spread"]
+    + hist_df["IG_Spread"]
+    + hist_df["VolTerm"]
+    - hist_df["VIX"]
+) / 7.0
+
+hist_df["Pressure_z"] = pressure_series
+hist_df["Trigger_z"] = trigger_series
+hist_df["Pressure_raw"] = pressure_raw
+hist_df["Trigger_raw"] = trigger_raw
+
 hist_df["Composite"] = (
     weights["Buffett_ratio"] * hist_df["Buffett_z"]
     + weights["CAPE"] * hist_df["CAPE_z"]
@@ -818,6 +1114,8 @@ history_cols = [
     "HY_Spread",
     "IG_Spread",
     "VolTerm",
+    "Pressure_raw",
+    "Trigger_raw",
     "Buffett_z",
     "CAPE_z",
     "M2_YoY_z",
@@ -828,6 +1126,8 @@ history_cols = [
     "HY_Spread_z",
     "IG_Spread_z",
     "VolTerm_z",
+    "Pressure_z",
+    "Trigger_z",
     "Composite",
     "Composite_real_time",
     "SP500",
@@ -841,66 +1141,162 @@ signals_rt.to_csv("output/bubbly_validation_signals_realtime.csv", index=False)
 summary_rt.to_csv("output/bubbly_validation_summary_realtime.csv", index=False)
 summary_comparison.to_csv("output/bubbly_validation_summary_comparison.csv", index=False)
 
-# Plot composite vs SPX drawdown
-fig, ax1 = plt.subplots(figsize=(11, 6))
-ax1.plot(hist_df.index, hist_df["Composite"], color="tab:blue", label="Composite Index")
-ax1.axhline(1.0, color="tab:blue", linestyle="--", linewidth=0.8, alpha=0.6)
-ax1.axhline(2.0, color="tab:blue", linestyle=":", linewidth=0.8, alpha=0.6)
-ax1.set_ylabel("Composite Z-score")
-ax1.set_xlabel("Date")
+event_dates = list(
+    pd.to_datetime(
+        signals_full.loc[signals_full["hit_threshold"], "signal_date"]
+    ).dropna().unique()
+)
+event_dates = [d for d in event_dates if d in hist_df.index]
+event_points = hist_df.loc[event_dates] if event_dates else pd.DataFrame()
 
-ax2 = ax1.twinx()
-ax2.fill_between(
+plt.rcParams.update(
+    {
+        "axes.titlesize": 14,
+        "axes.labelsize": 12,
+        "legend.fontsize": 10,
+        "font.family": "DejaVu Sans",
+    }
+)
+
+fig = plt.figure(figsize=(13, 8))
+gs = fig.add_gridspec(3, 1, height_ratios=[3, 2, 1.8], hspace=0.05)
+ax_top = fig.add_subplot(gs[0])
+ax_mid = fig.add_subplot(gs[1], sharex=ax_top)
+ax_bot = fig.add_subplot(gs[2], sharex=ax_top)
+
+regime_bands = [
+    (-4, 1, "#2d6a4f"),
+    (1, 2, "#f9c74f"),
+    (2, 4, "#ef233c"),
+]
+for y0, y1, color in regime_bands:
+    ax_top.axhspan(y0, y1, color=color, alpha=0.12, lw=0)
+
+ax_top.plot(
+    hist_df.index,
+    hist_df["Composite"],
+    label="Composite (z)",
+    color="#1f77b4",
+    linewidth=1.8,
+)
+if hist_df["Composite_real_time"].notna().any():
+    ax_top.plot(
+        hist_df.index,
+        hist_df["Composite_real_time"],
+        label="Composite pseudo real-time",
+        color="#ff7f0e",
+        linewidth=1.4,
+        linestyle="--",
+    )
+
+if not event_points.empty:
+    ax_top.scatter(
+        event_points.index,
+        event_points["Composite"],
+        color="#ef233c",
+        marker="o",
+        edgecolors="white",
+        linewidths=0.4,
+        s=36,
+        label="Signal → drawdown hit",
+        zorder=5,
+    )
+
+ax_top.axhline(0, color="white", alpha=0.3, linewidth=0.8)
+for thresh, style in [(1, "--"), (2, ":")]:
+    ax_top.axhline(thresh, color="white", alpha=0.4, linewidth=0.8, linestyle=style)
+
+ax_top.set_ylabel("Composite (z)")
+ax_top.set_title("Bubbly Composite Index")
+ax_top.legend(loc="upper left", frameon=False)
+ax_top.grid(alpha=0.15, linestyle="--")
+
+# Middle panel: pressure vs trigger
+ax_mid.plot(
+    hist_df.index,
+    hist_df["Pressure_z"],
+    label="Valuation pressure (z)",
+    color="#264653",
+    linewidth=1.6,
+)
+ax_mid.plot(
+    hist_df.index,
+    hist_df["Trigger_z"],
+    label="Liquidity / Vol trigger (z)",
+    color="#e76f51",
+    linewidth=1.6,
+)
+ax_mid.axhline(0, color="white", alpha=0.3, linewidth=0.8)
+ax_mid.set_ylabel("Pressure & Trigger (z)")
+ax_mid.legend(loc="upper left", frameon=False)
+ax_mid.grid(alpha=0.15, linestyle="--")
+
+# Bottom panel: drawdown
+ax_bot.fill_between(
     hist_df.index,
     hist_df["SPX_Drawdown"],
     0,
-    color="tab:red",
+    color="#d62828",
     alpha=0.3,
-    label="SPX Drawdown",
+    label="S&P 500 drawdown",
 )
-ax2.set_ylabel("SPX Drawdown")
-ax2.set_ylim(-0.8, 0.05)
+ax_bot.axhline(-0.15, color="white", alpha=0.4, linewidth=0.8, linestyle="--", label="-15% threshold")
+ax_bot.set_ylabel("Drawdown")
+ax_bot.set_xlabel("Date")
+ax_bot.set_ylim(min(hist_df["SPX_Drawdown"].min() * 1.1, -1.0), 0.05)
+ax_bot.legend(loc="lower left", frameon=False)
+ax_bot.grid(alpha=0.15, linestyle="--")
 
-handles1, labels1 = ax1.get_legend_handles_labels()
-handles2, labels2 = ax2.get_legend_handles_labels()
-ax1.legend(handles1 + handles2, labels1 + labels2, loc="upper left")
+for ax in (ax_top, ax_mid):
+    ax.tick_params(labelbottom=False)
 
-ax1.set_title("Bubbly Composite vs. S&P 500 Drawdowns")
-fig.tight_layout()
-plt.savefig("output/bubbly_backtest.png", dpi=200)
+fig.autofmt_xdate()
+fig.subplots_adjust(left=0.08, right=0.97, top=0.93, bottom=0.08, hspace=0.05)
+plt.savefig("output/bubbly_backtest.png", dpi=300, bbox_inches="tight")
 plt.close(fig)
 
-fig, ax = plt.subplots(figsize=(11, 6))
-ax.plot(hist_df.index, hist_df["Composite"], label="Composite (full)", color="tab:blue")
+# Real-time comparison quick chart
+fig, ax = plt.subplots(figsize=(12, 6))
+ax.plot(hist_df.index, hist_df["Composite"], label="Composite (z)", color="#1f77b4")
 ax.plot(
     hist_df.index,
     hist_df["Composite_real_time"],
-    label="Composite (pseudo real-time)",
-    color="tab:orange",
-    linewidth=1.0,
+    label="Composite pseudo real-time",
+    color="#ff7f0e",
+    linestyle="--",
 )
+ax.axhline(1, color="white", linestyle="--", alpha=0.3, linewidth=0.8)
+ax.axhline(2, color="white", linestyle=":", alpha=0.3, linewidth=0.8)
+ax.set_ylabel("Composite (z)")
+ax.set_xlabel("Date")
+ax.set_title("Composite (full vs. pseudo real-time)")
+ax.legend(loc="upper left", frameon=False)
+ax.grid(alpha=0.15, linestyle="--")
+
 ax2 = ax.twinx()
 ax2.fill_between(
     hist_df.index,
     hist_df["SPX_Drawdown"],
     0,
-    color="tab:red",
-    alpha=0.25,
-    label="SPX Drawdown",
+    color="#d62828",
+    alpha=0.2,
 )
-ax.set_ylabel("Composite Z-score")
-ax.set_xlabel("Date")
-ax.set_title("Bubbly Composite: Full vs. Pseudo Real-time")
-ax.legend(loc="upper left")
-ax2.set_ylabel("SPX Drawdown")
-ax2.set_ylim(-0.8, 0.05)
+ax2.set_ylabel("S&P 500 drawdown")
+ax2.set_ylim(min(hist_df["SPX_Drawdown"].min() * 1.1, -1.0), 0.05)
 fig.tight_layout()
-plt.savefig("output/bubbly_realtime_backtest.png", dpi=200)
+plt.savefig("output/bubbly_realtime_backtest.png", dpi=300, bbox_inches="tight")
 plt.close(fig)
+
+dashboard_path = build_plotly_dashboard(
+    hist_df,
+    event_dates=event_dates,
+    output_path=Path("output") / "bubbly_dashboard.html",
+)
 
 print("Historical series saved to output/bubbly_history.csv")
 print("Backtest chart saved to output/bubbly_backtest.png")
 print("Real-time comparison chart saved to output/bubbly_realtime_backtest.png")
+print(f"Interactive dashboard saved to {dashboard_path}")
 
 report_path = save_html_report(
     overview_df=df,

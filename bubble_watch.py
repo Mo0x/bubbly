@@ -6,8 +6,13 @@ Bubbly v1.1 – multi-source Bubble Phase Monitor
 import os
 from pathlib import Path
 import urllib.request, urllib.parse, json
+import socket
 
 import matplotlib
+
+
+# Set global timeout for all network operations
+socket.setdefaulttimeout(30)
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -56,8 +61,12 @@ def fetch_fred(series_id: str, freq=None) -> pd.Series:
     if freq:
         params["frequency"] = freq
     url = "https://api.stlouisfed.org/fred/series/observations?" + urllib.parse.urlencode(params)
-    with urllib.request.urlopen(url) as resp:
-        data = json.loads(resp.read().decode())
+    try:
+        with urllib.request.urlopen(url, timeout=30) as resp:
+            data = json.loads(resp.read().decode())
+    except Exception as e:
+        print(f"Error fetching FRED series {series_id}: {e}")
+        return pd.Series(dtype=float)
 
     vals, dates = [], []
     for o in data.get("observations", []):
@@ -109,8 +118,12 @@ def fetch_yahoo(symbol, start="1980-01-01") -> pd.Series:
 def fetch_quandl(code: str) -> pd.Series:
     """Fetch from Nasdaq Data Link (ex-Quandl)"""
     url = f"https://data.nasdaq.com/api/v3/datasets/{code}.json?api_key={QUANDL_KEY}"
-    with urllib.request.urlopen(url) as resp:
-        data = json.loads(resp.read().decode())
+    try:
+        with urllib.request.urlopen(url, timeout=30) as resp:
+            data = json.loads(resp.read().decode())
+    except Exception as e:
+        print(f"Error fetching Quandl series {code}: {e}")
+        return pd.Series(dtype=float)
     df = pd.DataFrame(data["dataset"]["data"], columns=data["dataset"]["column_names"])
     s = pd.Series(df["Value"].astype(float).values, index=pd.to_datetime(df["Date"]))
     s.name = code
@@ -687,6 +700,8 @@ def fetch_cape_series(local_path="data/ie_data.xls") -> pd.Series:
     """Load CAPE from FRED when possible, otherwise fall back to local Shiller file."""
     try:
         cape = fetch_fred("CAPE")
+        if cape.empty:
+            raise ValueError("FRED CAPE series is empty")
         cape = ensure_series(cape, "CAPE")
         cape.index = pd.to_datetime(cape.index)
         cape = cape.sort_index()

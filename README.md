@@ -2,6 +2,8 @@
 
 **Bubbly** is a macroeconomic composite model designed to detect unsustainable market regimes ("bubbles") by combining valuation pressure with liquidity and volatility triggers.
 
+check it out here : https://mo0x.github.io/bubbly/
+
 It generates:
 - 📊 An interactive dashboard (`output/bubbly_dashboard.html`)
 - 📄 A stylized HTML report (`output/bubbly_report.html`)

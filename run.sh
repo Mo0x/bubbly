@@ -8,7 +8,12 @@ STRICT_MODE="${BUBBLY_STRICT:-0}"
 M1_OK=0
 
 echo "[M1] Run full Bubbly pipeline"
-if python bubble_watch.py; then
+PYTHON_CMD="python3"
+if [[ -x "venv/bin/python" ]]; then
+    PYTHON_CMD="venv/bin/python"
+fi
+
+if $PYTHON_CMD bubble_watch.py; then
   M1_OK=1
   echo "M1 complete"
 else

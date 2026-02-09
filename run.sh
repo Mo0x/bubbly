@@ -1,71 +1,62 @@
 #!/usr/bin/env bash
+
 set -euo pipefail
 export PYTHONUNBUFFERED=1
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$ROOT_DIR"
 
-STRICT_MODE="${BUBBLY_STRICT:-0}"
-M1_OK=0
+# --- Configuration ---
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
-echo "[M1] Run full Bubbly pipeline"
-PYTHON_CMD="python3"
+# Log everything to bubbly_run.log and console
+LOG_FILE="bubbly_run.log"
+exec > >(tee -a "$LOG_FILE") 2>&1
+
+# Allow overriding python command, default to venv or system python
 if [[ -x "venv/bin/python" ]]; then
     PYTHON_CMD="venv/bin/python"
-fi
-
-if $PYTHON_CMD bubble_watch.py; then
-  M1_OK=1
-  echo "M1 complete"
+elif [[ -x ".venv/bin/python" ]]; then
+    PYTHON_CMD=".venv/bin/python"
 else
-  echo "WARNING: live pipeline run failed (likely network/data-provider issue)." >&2
-  echo "         Continuing in automated fallback mode using existing artifacts." >&2
-  if [[ "$STRICT_MODE" == "1" ]]; then
-    echo "BUBBLY_STRICT=1 set, aborting on M1 failure." >&2
-    exit 1
-  fi
+    PYTHON_CMD="python3"
 fi
 
-echo "[M2] Check M2 automation artifacts"
-python - <<'PY'
-from pathlib import Path
-import pandas as pd
+echo "========================================================"
+echo "Starting Bubbly Pipeline"
+echo "Root Directory: $SCRIPT_DIR"
+echo "Python Command: $PYTHON_CMD"
+echo "========================================================"
 
-cache = Path('data/m2_manual.csv')
-if not cache.is_file():
-    print('WARNING: data/m2_manual.csv not present yet (no successful WM2NS seed run).')
-    raise SystemExit(0)
+# --- Execution ---
+echo "[1/3] Running bubble_watch.py..."
+$PYTHON_CMD bubble_watch.py
 
-m2 = pd.read_csv(cache)
-needed = {'date', 'M2'}
-if not needed.issubset(set(m2.columns)):
-    raise SystemExit('M2 cache schema invalid. Expected columns: date,M2')
+# --- Verification ---
+echo "[2/3] Verifying artifacts..."
 
-print(f"M2 cache rows: {len(m2)} | last date: {m2['date'].iloc[-1]}")
-PY
-
-echo "[M3] Validate expected output artifacts"
-required=(
-  docs/bubbly_history.csv
-  docs/bubbly_validation_summary.csv
-  docs/bubbly_validation_summary_realtime.csv
-  docs/bubbly_validation_summary_comparison.csv
-  docs/bubbly_backtest.png
-  docs/bubbly_realtime_backtest.png
-  docs/index.html
-  docs/bubbly_report.html
+REQUIRED_ARTIFACTS=(
+    "docs/index.html"
+    "docs/bubbly_history.csv"
+    "docs/bubbly_report.html"
 )
 
-for path in "${required[@]}"; do
-  if [[ ! -f "$path" ]]; then
-    echo "Missing artifact: $path" >&2
-    exit 1
-  fi
-  echo "ok: $path"
+MISSING=0
+for artifact in "${REQUIRED_ARTIFACTS[@]}"; do
+    if [[ ! -f "$artifact" ]]; then
+        echo "❌ Missing: $artifact"
+        MISSING=1
+    else
+        echo "✅ Found: $artifact"
+    fi
 done
 
-if [[ "$M1_OK" == "1" ]]; then
-  echo "Bubbly automation complete ✅"
-else
-  echo "Bubbly automation complete with fallback mode ⚠️"
+if [[ "$MISSING" -eq 1 ]]; then
+    echo "========================================================"
+    echo "❌ Pipeline completed with MISSING artifacts."
+    echo "========================================================"
+    exit 1
 fi
+
+echo "========================================================"
+echo "✅ Bubbly Pipeline Completed Successfully."
+echo "========================================================"

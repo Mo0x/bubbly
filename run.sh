@@ -40,14 +40,14 @@ PY
 
 echo "[M3] Validate expected output artifacts"
 required=(
-  output/bubbly_history.csv
-  output/bubbly_validation_summary.csv
-  output/bubbly_validation_summary_realtime.csv
-  output/bubbly_validation_summary_comparison.csv
-  output/bubbly_backtest.png
-  output/bubbly_realtime_backtest.png
-  output/bubbly_dashboard.html
-  output/bubbly_report.html
+  docs/bubbly_history.csv
+  docs/bubbly_validation_summary.csv
+  docs/bubbly_validation_summary_realtime.csv
+  docs/bubbly_validation_summary_comparison.csv
+  docs/bubbly_backtest.png
+  docs/bubbly_realtime_backtest.png
+  docs/index.html
+  docs/bubbly_report.html
 )
 
 for path in "${required[@]}"; do

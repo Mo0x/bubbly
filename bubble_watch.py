@@ -1173,13 +1173,13 @@ history_cols = [
     "SP500",
     "SPX_Drawdown",
 ]
-os.makedirs("output", exist_ok=True)
-hist_df[history_cols].to_csv("output/bubbly_history.csv", float_format="%.4f")
-signals_full.to_csv("output/bubbly_validation_signals_full.csv", index=False)
-summary_full.to_csv("output/bubbly_validation_summary.csv", index=False)
-signals_rt.to_csv("output/bubbly_validation_signals_realtime.csv", index=False)
-summary_rt.to_csv("output/bubbly_validation_summary_realtime.csv", index=False)
-summary_comparison.to_csv("output/bubbly_validation_summary_comparison.csv", index=False)
+os.makedirs("docs", exist_ok=True)
+hist_df[history_cols].to_csv("docs/bubbly_history.csv", float_format="%.4f")
+signals_full.to_csv("docs/bubbly_validation_signals_full.csv", index=False)
+summary_full.to_csv("docs/bubbly_validation_summary.csv", index=False)
+signals_rt.to_csv("docs/bubbly_validation_signals_realtime.csv", index=False)
+summary_rt.to_csv("docs/bubbly_validation_summary_realtime.csv", index=False)
+summary_comparison.to_csv("docs/bubbly_validation_summary_comparison.csv", index=False)
 
 event_dates = list(
     pd.to_datetime(
@@ -1292,7 +1292,7 @@ for ax in (ax_top, ax_mid):
 
 fig.autofmt_xdate()
 fig.subplots_adjust(left=0.08, right=0.97, top=0.93, bottom=0.08, hspace=0.05)
-plt.savefig("output/bubbly_backtest.png", dpi=300, bbox_inches="tight")
+plt.savefig("docs/bubbly_backtest.png", dpi=300, bbox_inches="tight")
 plt.close(fig)
 
 # Real-time comparison quick chart
@@ -1324,18 +1324,18 @@ ax2.fill_between(
 ax2.set_ylabel("S&P 500 drawdown")
 ax2.set_ylim(min(hist_df["SPX_Drawdown"].min() * 1.1, -1.0), 0.05)
 fig.tight_layout()
-plt.savefig("output/bubbly_realtime_backtest.png", dpi=300, bbox_inches="tight")
+plt.savefig("docs/bubbly_realtime_backtest.png", dpi=300, bbox_inches="tight")
 plt.close(fig)
 
 dashboard_path = build_plotly_dashboard(
     hist_df,
     event_dates=event_dates,
-    output_path=Path("output") / "bubbly_dashboard.html",
+    output_path=Path("docs") / "index.html",
 )
 
-print("Historical series saved to output/bubbly_history.csv")
-print("Backtest chart saved to output/bubbly_backtest.png")
-print("Real-time comparison chart saved to output/bubbly_realtime_backtest.png")
+print("Historical series saved to docs/bubbly_history.csv")
+print("Backtest chart saved to docs/bubbly_backtest.png")
+print("Real-time comparison chart saved to docs/bubbly_realtime_backtest.png")
 print(f"Interactive dashboard saved to {dashboard_path}")
 
 report_path = save_html_report(
@@ -1347,7 +1347,7 @@ report_path = save_html_report(
     pressure=pressure,
     trigger=trigger,
     data_coverage=composite_last_date,
-    output_dir="output",
+    output_dir="docs",
     history_chart_filename="bubbly_backtest.png",
 )
 

@@ -30,6 +30,18 @@ From the existing checked-in artifacts:
 - Backtest + report/dashboard output generation working.
 
 ### M2 (money/liquidity data reliability)
+**Status: automated**
+- M2 signal is sourced from FRED weekly money stock (`WM2NS`) and converted to YoY in code.
+- The pipeline auto-refreshes a local cache at `data/m2_manual.csv` after successful FRED pulls.
+- If FRED is temporarily unavailable, the run automatically falls back to `data/m2_manual.csv` (no manual editing required for normal outages).
+
+### M3 (automation and validation)
+**Status: automated run wrapper added**
+- `./run.sh` now executes the full pipeline end-to-end.
+- It verifies M2 cache integrity and checks all expected output artifacts.
+- Future optional enhancement: replace C&I proxy with higher-fidelity margin debt feed when available.
+
+## How to run (fully automated)
 **Status: done with operational workaround**
 - M2 signal is currently sourced from FRED weekly money stock (`WM2NS`) and converted to YoY in code.
 - Operational note remembered from previous work: when FRED had intermittent/API issues, **M2 had to be updated manually** to keep runs unblocked.
@@ -49,6 +61,20 @@ From the existing checked-in artifacts:
    ```bash
    pip install -r requirements.txt
    ```
+3. Run everything (M1 + M2 + M3 checks):
+   ```bash
+   ./run.sh
+   ```
+   Optional strict mode (fail immediately if live data pull fails):
+   ```bash
+   BUBBLY_STRICT=1 ./run.sh
+   ```
+4. Open artifacts in `output/`.
+
+## M2 resilience behavior
+- Primary source: FRED `WM2NS`.
+- Automatic fallback: `data/m2_manual.csv`.
+- First-time setup note: if FRED is down and no local cache exists yet, run once when FRED is reachable to seed the cache.
 3. Run:
    ```bash
    python bubble_watch.py

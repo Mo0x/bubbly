@@ -200,9 +200,49 @@ def monthly_gdp_with_proxy(gdp: pd.Series, proxy: pd.Series) -> pd.Series:
     return blended
 
 
-def compute_weekly_m2_yoy() -> tuple[pd.Series, pd.Series]:
-    """Return weekly M2 levels and YoY % derived from WM2NS."""
-    m2_weekly = ensure_series(fetch_fred("WM2NS"), "M2")
+def load_m2_cache(cache_path: str | Path = "data/m2_manual.csv") -> pd.Series | None:
+    """Load cached/manual M2 weekly levels when FRED is unavailable."""
+    path = Path(cache_path)
+    if not path.is_file():
+        return None
+
+    df = pd.read_csv(path)
+    required = {"date", "M2"}
+    if not required.issubset(set(df.columns)):
+        raise RuntimeError(
+            f"M2 cache at {path} must contain columns {sorted(required)}"
+        )
+
+    s = pd.Series(df["M2"].astype(float).values, index=pd.to_datetime(df["date"]), name="M2")
+    return s.sort_index().dropna()
+
+
+def save_m2_cache(m2_weekly: pd.Series, cache_path: str | Path = "data/m2_manual.csv") -> Path:
+    """Persist M2 weekly levels so runs can continue through temporary FRED outages."""
+    path = Path(cache_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    out = ensure_series(m2_weekly, "M2").dropna().sort_index().to_frame(name="M2")
+    out.index.name = "date"
+    out.reset_index().to_csv(path, index=False)
+    return path
+
+
+def compute_weekly_m2_yoy(cache_path: str | Path = "data/m2_manual.csv") -> tuple[pd.Series, pd.Series]:
+    """Return weekly M2 levels and YoY % derived from WM2NS with automatic local fallback."""
+    try:
+        m2_weekly = ensure_series(fetch_fred("WM2NS"), "M2")
+        save_m2_cache(m2_weekly, cache_path)
+        print(f"M2 source: FRED WM2NS (cache refreshed at {cache_path})")
+    except Exception as exc:
+        cached = load_m2_cache(cache_path)
+        if cached is None:
+            raise RuntimeError(
+                "Unable to fetch WM2NS from FRED and no local M2 cache found at "
+                f"{cache_path}."
+            ) from exc
+        m2_weekly = cached
+        print(f"M2 source: local cache fallback at {cache_path} ({type(exc).__name__})")
+
     m2_weekly = m2_weekly.asfreq("W-MON")
     m2_weekly = m2_weekly.ffill()
     m2_yoy_weekly = m2_weekly.pct_change(52) * 100

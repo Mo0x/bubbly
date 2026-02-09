@@ -1367,3 +1367,13 @@ report_path = save_html_report(
 )
 
 print(f"\nReport saved to {report_path}")
+
+# === Explicit cleanup preventing hangs ===
+try:
+    import multitasking
+    multitasking.killall()
+except ImportError:
+    pass
+
+import sys
+sys.exit(0)

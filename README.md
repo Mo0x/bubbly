@@ -1,85 +1,83 @@
-# Bubbly — Bubble Phase Monitor
+# 🍾 Bubbly Market Monitor
 
-Bubbly is a macro/market composite model that tracks bubble regimes using valuation pressure + liquidity/credit triggers. It generates:
-- a historical dataset (`output/bubbly_history.csv`),
-- static backtest charts (`output/bubbly_backtest.png`, `output/bubbly_realtime_backtest.png`),
-- an interactive dashboard (`output/bubbly_dashboard.html`),
-- a styled HTML summary report (`output/bubbly_report.html`),
-- and validation tables for forward drawdown hit-rates.
+**Bubbly** is a macroeconomic composite model designed to detect unsustainable market regimes ("bubbles") by combining valuation pressure with liquidity and volatility triggers.
 
-## Where we left off (project status)
+It generates:
+- 📊 An interactive dashboard (`output/bubbly_dashboard.html`)
+- 📄 A stylized HTML report (`output/bubbly_report.html`)
+- 📈 Static backtest charts (`output/bubbly_backtest.png`)
+- 💾 A historical dataset (`output/bubbly_history.csv`)
 
-### ✅ What is already done
-- Multi-source data ingestion is wired (FRED, Yahoo Finance, local Shiller fallback for CAPE).
-- Composite model is implemented with `Pressure` + `Trigger` blocks and z-score normalization.
-- Historical and pseudo real-time composite backtesting are implemented.
-- Forward drawdown validation (6M/12M horizons) is implemented for both full-sample and pseudo real-time signals.
-- Outputs are already generated under `output/` and include dashboard/report artifacts.
+---
 
-### 📌 Latest generated snapshot in repo
-From the existing checked-in artifacts:
-- Latest data coverage appears to be **2025-09-30** (`output/bubbly_report.html`).
-- Latest composite level is about **1.03**, classified as **Euphoria**.
-- Latest validation comparison shows pseudo real-time hit-rate higher than full-sample for both 6M and 12M windows (`output/bubbly_validation_summary_comparison.csv`).
+## 🧠 Methodology
 
-## Milestones
+### Index Composition
+The Bubbly Index is a weighted composite of **10 indicators**, categorized into two drivers: **Valuation Pressure** (long-term structural setup) and **Liquidity/Volatility Triggers** (short-term catalysts).
 
-### M1 (core model + outputs)
-**Status: done**
-- Composite regime engine working.
-- Backtest + report/dashboard output generation working.
+#### 1. Valuation Pressure (Structural)
+High values indicate an expensive, overextended market.
+- **Buffett Ratio (30%)**: Total US Stock Market Cap / GDP. The ultimate measure of valuations relative to the economy.
+- **Shiller CAPE (30%)**: Cyclically Adjusted P/E Ratio. Valuations normalized for the business cycle.
+- **C&I Loans YoY (22%)**: Commercial & Industrial Loans growth. A proxy for corporate leverage and "animal spirits."
 
-### M2 (money/liquidity data reliability)
-**Status: automated**
-- M2 signal is sourced from FRED weekly money stock (`WM2NS`) and converted to YoY in code.
-- The pipeline auto-refreshes a local cache at `data/m2_manual.csv` after successful FRED pulls.
-- If FRED is temporarily unavailable, the run automatically falls back to `data/m2_manual.csv` (no manual editing required for normal outages).
+#### 2. Liquidity & Volatility Triggers (Catalysts)
+High values indicate tightening liquidity or rising stress. (Note: Inverted indicators mean *lower* values add to the bubble score).
+- **M2 Money Supply YoY (-25%)**: *Inverted*. Slower money growth = tighter liquidity = higher stress.
+- **Fed Balance Sheet YoY (-20%)**: *Inverted*. QT (shrinking balance sheet) adds to the score.
+- **Reverse Repo (RRP) YoY (15%)**: Rising RRP drains liquidity from the system.
+- **High Yield Spread (24%)**: Rising spreads indicate credit stress.
+- **Investment Grade Spread (12%)**: Rising spreads indicate higher quality credit stress.
+- **Vol Term Structure (24%)**: VIX / VXV ratio. An inverted curve (high short-term vol) signals fear.
+- **VIX (-18%)**: *Inverted*. Low volatility (complacency) adds to the bubble score during the buildup phase.
 
-### M3 (automation and validation)
-**Status: automated run wrapper added**
-- `./run.sh` now executes the full pipeline end-to-end.
-- It verifies M2 cache integrity and checks all expected output artifacts.
-- Future optional enhancement: replace C&I proxy with higher-fidelity margin debt feed when available.
+### Calculation Logic
+1.  **Normalization**: Each raw indicator is converted into an **expanding Z-score** (standard score).
+    *   *Why expanding?* To prevent look-ahead bias. The Z-score at time $t$ is calculated using only data available up to $t$.
+    *   *Min History*: Requires 24 months of data before generating a score.
+    *   *Clipping*: Z-scores are clipped at $\pm 4.0$ to contain outliers.
+2.  **Aggregation**: The Z-scores are weighted (using the weights above) and summed to produce the **Composite Score**.
 
-## How to run (fully automated)
-**Status: done with operational workaround**
-- M2 signal is currently sourced from FRED weekly money stock (`WM2NS`) and converted to YoY in code.
-- Operational note remembered from previous work: when FRED had intermittent/API issues, **M2 had to be updated manually** to keep runs unblocked.
-- Action kept in mind: if FRED fails for M2 again, update M2 input manually (or cache local series) before rerunning the model.
+### Regime Definitions
+| Composite Score | Regime | Description |
+| :--- | :--- | :--- |
+| **< 1.0** | 🟢 **Expansion** | Healthy market behavior. Valuations and liquidity are supportive. |
+| **1.0 – 2.0** | 🟡 **Euphoria** | Warning zone. Valuation pressure is building or liquidity is fading. |
+| **≥ 2.0** | 🔴 **Instability** | Danger zone. Highly stretched valuations meeting distinct liquidity/credit stress. |
 
-### M3 (future hardening candidates)
-**Status: open**
-- Improve data-source robustness/caching (especially for FRED outages).
-- Consider replacing C&I proxy with higher-fidelity margin debt feed when available.
+---
 
-## How to rerun
+## 🚀 How to Run
 
-1. (Optional) Create `apikeys.env` in repo root:
-   - `FRED_API_KEY=...`
-   - `QUANDL_API_KEY=...`
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. Run everything (M1 + M2 + M3 checks):
-   ```bash
-   ./run.sh
-   ```
-   Optional strict mode (fail immediately if live data pull fails):
-   ```bash
-   BUBBLY_STRICT=1 ./run.sh
-   ```
-4. Open artifacts in `output/`.
+### 1. Setup
+Create an `apikeys.env` file in the root directory (optional, but recommended for full data access):
+```env
+FRED_API_KEY=your_key_here
+QUANDL_API_KEY=your_key_here
+```
 
-## M2 resilience behavior
-- Primary source: FRED `WM2NS`.
-- Automatic fallback: `data/m2_manual.csv`.
-- First-time setup note: if FRED is down and no local cache exists yet, run once when FRED is reachable to seed the cache.
-3. Run:
-   ```bash
-   python bubble_watch.py
-   ```
-4. Open artifacts in `output/`.
+Install dependencies:
+```bash
+pip install -r requirements.txt
+```
 
-## Practical note about M2
-If you observe missing/buggy FRED responses for `WM2NS`, treat M2 as a manual maintenance point for the run (inject/patch the latest M2 values locally, then rerun). This matches the M2 workaround used previously.
+### 2. Execute
+Run the full pipeline wrapper:
+```bash
+./run.sh
+```
+This script handles:
+-   Dependency checks.
+-   Data fetching (FRED, Yahoo, Shiller).
+-   Manual M2 cache fallback (resilience against FRED API outages).
+-   Report generation.
+
+### 3. View Results
+Open the generated artifacts in the `output/` directory:
+-   `bubbly_dashboard.html`: Interactive view.
+-   `bubbly_report.html`: Summary report.
+
+---
+
+## 🛠 Resilience Notes
+**M2 Money Supply**: We source `WM2NS` from FRED. If the FRED API fails (common for this specific series), the script automatically falls back to `data/m2_manual.csv`. If you encounter data gaps, manually update this CSV with the latest values.

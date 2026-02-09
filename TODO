@@ -1,4 +1,7 @@
-Consider swapping the C&I proxy for true FINRA margin debt via their authenticated API when you’re ready; the plumbing is in place to drop in a higher fidelity leverage feed.
+### Future Enhancements (Data Quality)
+- **Leverage Proxy Upgrade**: Currently using C&I Loans (`TOTCI`) as a proxy for corporate leverage/animal spirits.
+  - Swap this for **true FINRA margin debt** via their authenticated API.
+  - The plumbing is already in place to drop in this higher-fidelity leverage feed.
 
 ### Monthly Update Requirements (Data Freshness)
 - **GDP / Buffett Ratio Lag**: Currently limited by quarterly GDP releases. To achieve monthly updates:

@@ -3,7 +3,7 @@ numpy
 matplotlib
 plyer
 yfinance
-pandas-datareader
+
 openpyxl
 xlrd>=2.0.1
 plotly

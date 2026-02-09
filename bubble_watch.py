@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import yfinance as yf
-from pandas_datareader import data as pdr
+# from pandas_datareader import data as pdr
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from plotly.offline import plot as plotly_plot
@@ -84,10 +84,10 @@ def fetch_yahoo(symbol, start="1980-01-01") -> pd.Series:
         df = pd.DataFrame()
 
     if df.empty:
-        try:
-            df = pdr.get_data_yahoo(symbol, start=start)
-        except Exception as exc:
-            raise RuntimeError(f"Failed to fetch data for {symbol}") from exc
+        # try:
+        #     df = pdr.get_data_yahoo(symbol, start=start)
+        # except Exception as exc:
+        raise RuntimeError(f"Failed to fetch data for {symbol}") # from exc
 
     if isinstance(df, pd.DataFrame):
         # prefer 'Adj Close' if present

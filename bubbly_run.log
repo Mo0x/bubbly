@@ -147,3 +147,139 @@ Report saved to docs/bubbly_report.html
 ========================================================
 ✅ Bubbly Pipeline Completed Successfully.
 ========================================================
+========================================================
+Starting Bubbly Pipeline
+Root Directory: /home/phuture/Bubbly
+Python Command: venv/bin/python
+========================================================
+[1/3] Running bubble_watch.py...
+Fetching data ...
+M2 source: FRED WM2NS (cache refreshed at data/m2_manual.csv)
+Error fetching FRED series CAPE: HTTP Error 400: Bad Request
+
+--- BUBBLY REPORT ---
+                     Z-score  Latest_value  Weight  Contribution   Last_date
+Buffett_ratio           2.76        216.24    0.27          0.75  2025-12-31
+CAPE                    1.87         39.51    0.27          0.51  2025-10-01
+CI_Loans_YoY           -0.28          2.17    0.20         -0.06  2026-01-31
+M2_YoY                 -0.17          4.89   -0.23          0.04  2026-01-05
+FedBalanceSheet_YoY    -0.56         -3.09   -0.18          0.10  2026-01-28
+RRP_YoY                 0.00          0.00    0.14          0.00  2026-01-28
+HY_Spread              -0.78          2.89    0.22         -0.17  2026-02-06
+IG_Spread              -0.74          1.75    0.11         -0.08  2026-02-06
+VIX                    -0.64         14.95   -0.16          0.10  2026-02-09
+VolTerm                -0.27          0.82    0.22         -0.06  2026-02-09
+
+Composite phase index: 1.14 → Euphoria
+Valuation pressure: 1.45 | Liquidity/vol trigger: -0.06
+Interactive dashboard saved to docs/index.html
+Report saved to docs/bubbly_report.html
+[2/3] Verifying artifacts...
+✅ Found: docs/index.html
+✅ Found: docs/bubbly_history.csv
+✅ Found: docs/bubbly_report.html
+========================================================
+✅ Bubbly Pipeline Completed Successfully.
+========================================================
+========================================================
+Starting Bubbly Pipeline
+Root Directory: /home/phuture/Bubbly
+Python Command: venv/bin/python
+========================================================
+[1/3] Running bubble_watch.py...
+Fetching data ...
+M2 source: FRED WM2NS (cache refreshed at data/m2_manual.csv)
+Error fetching FRED series CAPE: HTTP Error 400: Bad Request
+
+--- BUBBLY REPORT ---
+                     Z-score  Latest_value  Weight  Contribution   Last_date
+Buffett_ratio           2.76        216.24    0.27          0.75  2025-12-31
+CAPE                    1.87         39.51    0.27          0.51  2025-10-01
+CI_Loans_YoY           -0.28          2.17    0.20         -0.06  2026-01-31
+M2_YoY                 -0.17          4.89   -0.23          0.04  2026-01-05
+FedBalanceSheet_YoY    -0.56         -3.09   -0.18          0.10  2026-01-28
+RRP_YoY                 0.00          0.00    0.14          0.00  2026-01-28
+HY_Spread              -0.78          2.89    0.22         -0.17  2026-02-06
+IG_Spread              -0.74          1.75    0.11         -0.08  2026-02-06
+VIX                    -0.64         14.95   -0.16          0.10  2026-02-09
+VolTerm                -0.27          0.82    0.22         -0.06  2026-02-09
+
+Composite phase index: 1.14 → Euphoria
+Valuation pressure: 1.45 | Liquidity/vol trigger: -0.06
+Interactive dashboard saved to docs/index.html
+Report saved to docs/bubbly_report.html
+[2/3] Verifying artifacts...
+✅ Found: docs/index.html
+✅ Found: docs/bubbly_history.csv
+✅ Found: docs/bubbly_report.html
+========================================================
+✅ Bubbly Pipeline Completed Successfully.
+========================================================
+========================================================
+Starting Bubbly Pipeline
+Root Directory: /home/phuture/Bubbly
+Python Command: venv/bin/python
+========================================================
+[1/3] Running bubble_watch.py...
+Fetching data ...
+M2 source: FRED WM2NS (cache refreshed at data/m2_manual.csv)
+Error fetching FRED series CAPE: HTTP Error 400: Bad Request
+
+--- BUBBLY REPORT ---
+                     Z-score  Latest_value  Weight  Contribution   Last_date
+Buffett_ratio           2.76        216.24    0.27          0.75  2025-12-31
+CAPE                    1.87         39.51    0.27          0.51  2025-10-01
+CI_Loans_YoY           -0.28          2.17    0.20         -0.06  2026-01-31
+M2_YoY                 -0.17          4.89   -0.23          0.04  2026-01-05
+FedBalanceSheet_YoY    -0.56         -3.09   -0.18          0.10  2026-01-28
+RRP_YoY                 0.00          0.00    0.14          0.00  2026-01-28
+HY_Spread              -0.78          2.89    0.22         -0.17  2026-02-06
+IG_Spread              -0.74          1.75    0.11         -0.08  2026-02-06
+VIX                    -0.64         14.95   -0.16          0.10  2026-02-09
+VolTerm                -0.27          0.82    0.22         -0.06  2026-02-09
+
+Composite phase index: 1.14 → Euphoria
+Valuation pressure: 1.45 | Liquidity/vol trigger: -0.06
+Interactive dashboard saved to docs/index.html
+Report saved to docs/bubbly_report.html
+[2/3] Verifying artifacts...
+✅ Found: docs/index.html
+✅ Found: docs/bubbly_history.csv
+✅ Found: docs/bubbly_report.html
+========================================================
+✅ Bubbly Pipeline Completed Successfully.
+========================================================
+========================================================
+Starting Bubbly Pipeline
+Root Directory: /home/phuture/Bubbly
+Python Command: venv/bin/python
+========================================================
+[1/3] Running bubble_watch.py...
+Fetching data ...
+M2 source: FRED WM2NS (cache refreshed at data/m2_manual.csv)
+Error fetching FRED series CAPE: HTTP Error 400: Bad Request
+
+--- BUBBLY REPORT ---
+                     Z-score  Latest_value  Weight  Contribution   Last_date
+Buffett_ratio           2.76        216.24    0.27          0.75  2025-12-31
+CAPE                    1.87         39.51    0.27          0.51  2025-10-01
+CI_Loans_YoY           -0.28          2.17    0.20         -0.06  2026-01-31
+M2_YoY                 -0.17          4.89   -0.23          0.04  2026-01-05
+FedBalanceSheet_YoY    -0.56         -3.09   -0.18          0.10  2026-01-28
+RRP_YoY                 0.00          0.00    0.14          0.00  2026-01-28
+HY_Spread              -0.78          2.89    0.22         -0.17  2026-02-06
+IG_Spread              -0.74          1.75    0.11         -0.08  2026-02-06
+VIX                    -0.64         14.95   -0.16          0.10  2026-02-09
+VolTerm                -0.27          0.82    0.22         -0.06  2026-02-09
+
+Composite phase index: 1.14 → Euphoria
+Valuation pressure: 1.45 | Liquidity/vol trigger: -0.06
+Interactive dashboard saved to docs/index.html
+Report saved to docs/bubbly_report.html
+[2/3] Verifying artifacts...
+✅ Found: docs/index.html
+✅ Found: docs/bubbly_history.csv
+✅ Found: docs/bubbly_report.html
+========================================================
+✅ Bubbly Pipeline Completed Successfully.
+========================================================

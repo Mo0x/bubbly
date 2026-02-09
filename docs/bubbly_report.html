@@ -13,9 +13,7 @@
             body {
                 margin: 0;
                 padding: 0;
-                background: radial-gradient(circle at 20% 20%, rgba(255,255,255,0.08), transparent 40%),
-                            radial-gradient(circle at 80% 30%, rgba(255,255,255,0.05), transparent 45%),
-                            #0b0f16;
+                background-color: #0b0f16;
                 color: #f6f7fb;
                 min-height: 100vh;
             }
@@ -45,8 +43,28 @@
                 color: rgba(255, 255, 255, 0.7);
                 letter-spacing: 0.18em;
                 text-transform: uppercase;
+                margin-bottom: 1.5rem;
                 position: relative;
                 z-index: 1;
+            }
+            .nav-back {
+                position: relative;
+                z-index: 10;
+                display: inline-block;
+            }
+            .nav-back a {
+                color: #ffd782;
+                text-decoration: none;
+                font-size: 0.9rem;
+                border: 1px solid rgba(255,215,130,0.3);
+                padding: 0.4rem 1rem;
+                border-radius: 20px;
+                background: rgba(0,0,0,0.2);
+                transition: all 0.2s;
+            }
+            .nav-back a:hover {
+                background: rgba(255,215,130,0.1);
+                border-color: rgba(255,215,130,0.6);
             }
             main {
                 max-width: 1100px;
@@ -54,7 +72,7 @@
                 padding: 0 1.5rem 4rem;
             }
             section {
-                background: rgba(12, 18, 30, 0.82);
+                background: #111111;
                 border: 1px solid rgba(255, 255, 255, 0.05);
                 border-radius: 24px;
                 padding: 2rem;
@@ -156,6 +174,9 @@
         <header>
             <div class="title">🍾 Bubbly Market Monitor</div>
             <div class="subtitle">A whimsical watch on market froth</div>
+            <div style="margin-top: 1rem;">
+                <a href="index.html" style="color: #ffd782; text-decoration: none; border: 1px solid rgba(255,215,130,0.3); padding: 0.5rem 1rem; border-radius: 8px;">&larr; Back to Dashboard</a>
+            </div>
         </header>
         <main>
             <section>
@@ -376,7 +397,7 @@
             </section>
         </main>
         <footer>
-            Crafted with bubbles and benchmarks · 2026-02-09 18:28 UTC
+            Crafted with bubbles and benchmarks · 2026-02-09 19:08 UTC
         </footer>
     </body>
     </html>

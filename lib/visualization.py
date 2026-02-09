@@ -162,7 +162,7 @@ def build_plotly_dashboard(
             x=pressure_raw.index,
             y=pressure_raw,
             name="Pressure (raw)",
-            line=dict(color="#264653", width=2, dash="dot"),
+            line=dict(color="#4cc9f0", width=2, dash="dot"), # Brighter cyan for visibility
             hovertemplate="Pressure (raw): %{y:.2f}<br>Z-score: %{customdata[0]:.2f}<extra></extra>",
             customdata=np.column_stack([pressure_z]),
             visible=False,
@@ -215,7 +215,11 @@ def build_plotly_dashboard(
                     method="update",
                     args=[
                         {"visible": vis_z},
-                        {"yaxis2": {"title": "Pressure / Trigger (z-score)"}},
+                        {
+                            "yaxis.autorange": True,
+                            "yaxis2.title": "Pressure / Trigger (z-score)",
+                            "yaxis2.autorange": True,
+                        },
                     ],
                 ),
                 dict(
@@ -223,7 +227,11 @@ def build_plotly_dashboard(
                     method="update",
                     args=[
                         {"visible": vis_raw},
-                        {"yaxis2": {"title": "Pressure / Trigger (raw units)"}},
+                        {
+                            "yaxis.autorange": True,
+                            "yaxis2.title": "Pressure / Trigger (raw units)",
+                            "yaxis2.autorange": True,
+                        },
                     ],
                 ),
             ],
@@ -242,7 +250,7 @@ def build_plotly_dashboard(
         updatemenus=updatemenus,
         shapes=regime_shapes,
         paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
+        # plot_bgcolor="rgba(0,0,0,0)", # Commented out to restore standard dark theme background
         font=dict(family="Inter, sans-serif"),
         hoverlabel=dict(
             bgcolor="rgba(11, 15, 22, 0.95)",
@@ -256,7 +264,7 @@ def build_plotly_dashboard(
         row=3, 
         col=1, 
         showgrid=True, 
-        gridcolor="rgba(255,255,255,0.08)",
+        gridcolor="rgba(255,255,255,0.15)",
         showspikes=True,
         spikemode="across",
         spikesnap="cursor",
@@ -268,15 +276,15 @@ def build_plotly_dashboard(
     # For shared_xaxes=True in make_subplots, usually bottom axis controls.
     # explicit on 1,1 just in case, though shared_xaxes handles it via matches
     
-    fig.update_yaxes(title_text="Composite (z)", row=1, col=1, showgrid=True, gridcolor="rgba(255,255,255,0.08)")
-    fig.update_yaxes(title_text="Pressure / Trigger (z-score)", row=2, col=1, showgrid=True, gridcolor="rgba(255,255,255,0.08)")
+    fig.update_yaxes(title_text="Composite (z)", row=1, col=1, showgrid=True, gridcolor="rgba(255,255,255,0.15)")
+    fig.update_yaxes(title_text="Pressure / Trigger (z-score)", row=2, col=1, showgrid=True, gridcolor="rgba(255,255,255,0.15)")
     fig.update_yaxes(
         title_text="S&P 500 Drawdown",
         row=3,
         col=1,
         tickformat=".0%",
         range=[min(drawdown.min() * 1.1, -1.0), 0.05],
-        showgrid=True, gridcolor="rgba(255,255,255,0.08)"
+        showgrid=True, gridcolor="rgba(255,255,255,0.15)"
     )
 
     # Threshold lines
@@ -324,9 +332,7 @@ def build_plotly_dashboard(
             body {{
                 margin: 0;
                 padding: 0;
-                background: radial-gradient(circle at 20% 20%, rgba(255,255,255,0.08), transparent 40%),
-                            radial-gradient(circle at 80% 30%, rgba(255,255,255,0.05), transparent 45%),
-                            #0b0f16;
+                background-color: #0b0f16;
                 color: #f6f7fb;
                 min-height: 100vh;
                 display: flex;
@@ -374,7 +380,7 @@ def build_plotly_dashboard(
                 padding: 2rem 1rem;
             }}
             .chart-container {{
-                background: rgba(12, 18, 30, 0.6);
+                background: #111111;
                 border: 1px solid rgba(255, 255, 255, 0.05);
                 border-radius: 24px;
                 padding: 1rem;
@@ -517,9 +523,7 @@ def save_html_report(
             body {{
                 margin: 0;
                 padding: 0;
-                background: radial-gradient(circle at 20% 20%, rgba(255,255,255,0.08), transparent 40%),
-                            radial-gradient(circle at 80% 30%, rgba(255,255,255,0.05), transparent 45%),
-                            #0b0f16;
+                background-color: #0b0f16;
                 color: #f6f7fb;
                 min-height: 100vh;
             }}
@@ -549,8 +553,28 @@ def save_html_report(
                 color: rgba(255, 255, 255, 0.7);
                 letter-spacing: 0.18em;
                 text-transform: uppercase;
+                margin-bottom: 1.5rem;
                 position: relative;
                 z-index: 1;
+            }}
+            .nav-back {{
+                position: relative;
+                z-index: 10;
+                display: inline-block;
+            }}
+            .nav-back a {{
+                color: #ffd782;
+                text-decoration: none;
+                font-size: 0.9rem;
+                border: 1px solid rgba(255,215,130,0.3);
+                padding: 0.4rem 1rem;
+                border-radius: 20px;
+                background: rgba(0,0,0,0.2);
+                transition: all 0.2s;
+            }}
+            .nav-back a:hover {{
+                background: rgba(255,215,130,0.1);
+                border-color: rgba(255,215,130,0.6);
             }}
             main {{
                 max-width: 1100px;
@@ -558,7 +582,7 @@ def save_html_report(
                 padding: 0 1.5rem 4rem;
             }}
             section {{
-                background: rgba(12, 18, 30, 0.82);
+                background: #111111;
                 border: 1px solid rgba(255, 255, 255, 0.05);
                 border-radius: 24px;
                 padding: 2rem;
@@ -660,6 +684,9 @@ def save_html_report(
         <header>
             <div class=\"title\">🍾 Bubbly Market Monitor</div>
             <div class=\"subtitle\">A whimsical watch on market froth</div>
+            <div style=\"margin-top: 1rem;\">
+                <a href=\"index.html\" style=\"color: #ffd782; text-decoration: none; border: 1px solid rgba(255,215,130,0.3); padding: 0.5rem 1rem; border-radius: 8px;\">&larr; Back to Dashboard</a>
+            </div>
         </header>
         <main>
             <section>

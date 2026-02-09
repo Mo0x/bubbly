@@ -23,4 +23,5 @@
       - On the main page we need to show a separate chart of Nasdaq and or sp500 in order to be more visual
       - the signal drawdown should be a bubble instead of a cross (bubble is in the name of the project)
       - page should have the full black background
-      - charts each of the index composition, for a more granular vision, IE chart vix, sp500, C&I (TOTCI) etc... 
+      - charts each of the index composition, for a more granular vision, IE chart vix, sp500, C&I (TOTCI) etc...  
+      - should prevent to zoom out too much but the rescale button already act correctly

@@ -1,3 +1,10 @@
+### Maintanability
+  - Refactor the code bas logically, our files are too big and long.
+
+### Index composition
+  - toy a bit with the weighting of the index, perhaps VIX is over-represented
+
+
 ### Future Enhancements (Data Quality)
 - **Leverage Proxy Upgrade**: Currently using C&I Loans (`TOTCI`) as a proxy for corporate leverage/animal spirits.
   - Swap this for **true FINRA margin debt** via their authenticated API.
@@ -9,6 +16,11 @@
   - OR switch the denominator of the Buffett Ratio to a monthly metric like **Total Personal Income** or a monthly GDP measure if available from a reliable source (e.g., Macroeconomic Advisers, though often paid).
 - **CAPE Ratio Lag**: Shiller CAPE is released with a lag.
   - Implement a "Nowcast CAPE" using the realtime S&P 500 price and the 10-year moving average of earnings (interpolated from quarterly earnings). This would allow daily/weekly updates of the CAPE ratio .
-  ### Important
-
-    - Improve naviagation inside index.html
+### Front end
+  - Improve naviagation inside index.html:
+      - EG you can zoom in chart with raw/zscore be cannot go back to main page. We need a fuild navigation experience. 
+      - Should have a link to check the report from the index !
+      - On the main page we need to show a separate chart of Nasdaq and or sp500 in order to be more visual
+      - the signal drawdown should be a bubble instead of a cross (bubble is in the name of the project)
+      - page should have the full black background
+      - charts each of the index composition, for a more granular vision, IE chart vix, sp500, C&I (TOTCI) etc... 

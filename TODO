@@ -1,1 +1,8 @@
 Consider swapping the C&I proxy for true FINRA margin debt via their authenticated API when you’re ready; the plumbing is in place to drop in a higher fidelity leverage feed.
+
+### Monthly Update Requirements (Data Freshness)
+- **GDP / Buffett Ratio Lag**: Currently limited by quarterly GDP releases. To achieve monthly updates:
+  - Implement a monthly GDP proxy using high-frequency data (e.g., Industrial Production, Retail Sales) to interpolate/extrapolate monthly GDP estimates.
+  - OR switch the denominator of the Buffett Ratio to a monthly metric like **Total Personal Income** or a monthly GDP measure if available from a reliable source (e.g., Macroeconomic Advisers, though often paid).
+- **CAPE Ratio Lag**: Shiller CAPE is released with a lag.
+  - Implement a "Nowcast CAPE" using the realtime S&P 500 price and the 10-year moving average of earnings (interpolated from quarterly earnings). This would allow daily/weekly updates of the CAPE ratio.

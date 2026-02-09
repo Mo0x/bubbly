@@ -25,7 +25,7 @@ def build_plotly_dashboard(
     event_dates: list[pd.Timestamp],
     output_path: str | Path,
 ) -> Path:
-    """Create an interactive Plotly dashboard and write it to disk."""
+    """Create an interactive Plotly dashboard embedded in a custom HTML template."""
     composite = hist_df["Composite"]
     realtime = hist_df["Composite_real_time"]
     pressure_z = hist_df["Pressure_z"]
@@ -119,7 +119,7 @@ def build_plotly_dashboard(
                 y=event_points["Composite"],
                 mode="markers",
                 name="Signal → drawdown hit",
-                marker=dict(color="#ef233c", size=8, symbol="x"),
+                marker=dict(color="#ef233c", size=14, symbol="circle", opacity=0.8, line=dict(color="white", width=1)),
                 hovertemplate="Event: %{x|%Y-%m}<br>Composite: %{y:.2f}<extra></extra>",
             ),
             row=1,
@@ -207,7 +207,7 @@ def build_plotly_dashboard(
             type="buttons",
             direction="right",
             x=0,
-            y=1.18,
+            y=1.1,
             xanchor="left",
             buttons=[
                 dict(
@@ -227,28 +227,35 @@ def build_plotly_dashboard(
                     ],
                 ),
             ],
+            bgcolor="rgba(0,0,0,0)",
+            bordercolor="rgba(255,255,255,0.1)",
+            font=dict(color="#ffd782")
         )
     ]
 
     fig.update_layout(
         template="plotly_dark",
-        height=900,
-        margin=dict(l=70, r=40, t=80, b=50),
+        height=850,
+        margin=dict(l=60, r=40, t=60, b=40),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         hovermode="x unified",
         updatemenus=updatemenus,
         shapes=regime_shapes,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Inter, sans-serif"),
     )
 
-    fig.update_xaxes(title_text="Date", row=3, col=1)
-    fig.update_yaxes(title_text="Composite (z)", row=1, col=1)
-    fig.update_yaxes(title_text="Pressure / Trigger (z-score)", row=2, col=1)
+    fig.update_xaxes(title_text="Date", row=3, col=1, showgrid=True, gridcolor="rgba(255,255,255,0.08)")
+    fig.update_yaxes(title_text="Composite (z)", row=1, col=1, showgrid=True, gridcolor="rgba(255,255,255,0.08)")
+    fig.update_yaxes(title_text="Pressure / Trigger (z-score)", row=2, col=1, showgrid=True, gridcolor="rgba(255,255,255,0.08)")
     fig.update_yaxes(
         title_text="S&P 500 Drawdown",
         row=3,
         col=1,
         tickformat=".0%",
         range=[min(drawdown.min() * 1.1, -1.0), 0.05],
+        showgrid=True, gridcolor="rgba(255,255,255,0.08)"
     )
 
     # Threshold lines
@@ -266,17 +273,124 @@ def build_plotly_dashboard(
         col=1,
     )
 
-    output_path = Path(output_path)
-    plotly_plot(
+    # Generate DIV instead of full HTML
+    obs_div = plotly_plot(
         fig,
-        filename=str(output_path),
-        auto_open=False,
+        output_type="div",
+        include_plotlyjs=True,  # Embed JS to be safe, or use CDN
         config={
             "displaylogo": False,
             "responsive": True,
             "toImageButtonOptions": {"format": "png", "filename": "bubbly_dashboard", "scale": 2},
         },
     )
+
+    # --- Construct Full HTML Page ---
+    
+    html_template = f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>🍾 Bubbly Market Monitor - Dashboard</title>
+        <style>
+            :root {{
+                color-scheme: dark;
+                font-family: 'Inter', 'Segoe UI', sans-serif;
+            }}
+            body {{
+                margin: 0;
+                padding: 0;
+                background: radial-gradient(circle at 20% 20%, rgba(255,255,255,0.08), transparent 40%),
+                            radial-gradient(circle at 80% 30%, rgba(255,255,255,0.05), transparent 45%),
+                            #0b0f16;
+                color: #f6f7fb;
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+            }}
+            header {{
+                padding: 1.5rem 2rem;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                background: rgba(11, 15, 22, 0.85);
+                backdrop-filter: blur(12px);
+                border-bottom: 1px solid rgba(255,255,255,0.08);
+                position: sticky;
+                top: 0;
+                z-index: 1000;
+            }}
+            .brand {{
+                font-size: 1.5rem;
+                font-weight: 700;
+                letter-spacing: 0.05em;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            }}
+            .nav-link {{
+                color: #ffd782;
+                text-decoration: none;
+                font-weight: 600;
+                font-size: 0.95rem;
+                padding: 0.5rem 1rem;
+                border: 1px solid rgba(255, 215, 130, 0.3);
+                border-radius: 8px;
+                transition: all 0.2s ease;
+            }}
+            .nav-link:hover {{
+                background: rgba(255, 215, 130, 0.15);
+                border-color: rgba(255, 215, 130, 0.6);
+            }}
+            main {{
+                flex: 1;
+                width: 100%;
+                max-width: 1600px;
+                margin: 0 auto;
+                padding: 2rem 1rem;
+            }}
+            .chart-container {{
+                background: rgba(12, 18, 30, 0.6);
+                border: 1px solid rgba(255, 255, 255, 0.05);
+                border-radius: 24px;
+                padding: 1rem;
+                box-shadow: 0 20px 45px rgba(5, 10, 22, 0.45);
+                min-height: 800px;
+            }}
+            footer {{
+                text-align: center;
+                padding: 1.5rem;
+                color: rgba(255, 255, 255, 0.45);
+                font-size: 0.85rem;
+                border-top: 1px solid rgba(255,255,255,0.05);
+            }}
+        </style>
+    </head>
+    <body>
+        <header>
+            <div class="brand">
+                <span>🍾</span> Bubbly Market Monitor
+            </div>
+            <a href="bubbly_report.html" class="nav-link">View Detailed Report &rarr;</a>
+        </header>
+
+        <main>
+            <div class="chart-container">
+                {obs_div}
+            </div>
+        </main>
+
+        <footer>
+            Crafted with bubbles and benchmarks · {pd.Timestamp.utcnow().strftime('%Y-%m-%d %H:%M UTC')}
+        </footer>
+    </body>
+    </html>
+    """
+
+    output_path = Path(output_path)
+    output_path.write_text(html_template, encoding="utf-8")
     return output_path
 
 def _format_timestamp(ts) -> str:

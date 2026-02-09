@@ -244,9 +244,30 @@ def build_plotly_dashboard(
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(family="Inter, sans-serif"),
+        hoverlabel=dict(
+            bgcolor="rgba(11, 15, 22, 0.95)",
+            bordercolor="rgba(255, 215, 130, 0.3)",
+            font=dict(size=13, color="#f6f7fb")
+        ),
     )
 
-    fig.update_xaxes(title_text="Date", row=3, col=1, showgrid=True, gridcolor="rgba(255,255,255,0.08)")
+    fig.update_xaxes(
+        title_text="Date", 
+        row=3, 
+        col=1, 
+        showgrid=True, 
+        gridcolor="rgba(255,255,255,0.08)",
+        showspikes=True,
+        spikemode="across",
+        spikesnap="cursor",
+        showline=True, 
+        linewidth=1, 
+        linecolor="rgba(255,255,255,0.2)"
+    )
+    # Enable spikes on shared axes implies enabling on all if matches="x" logic or just main x
+    # For shared_xaxes=True in make_subplots, usually bottom axis controls.
+    # explicit on 1,1 just in case, though shared_xaxes handles it via matches
+    
     fig.update_yaxes(title_text="Composite (z)", row=1, col=1, showgrid=True, gridcolor="rgba(255,255,255,0.08)")
     fig.update_yaxes(title_text="Pressure / Trigger (z-score)", row=2, col=1, showgrid=True, gridcolor="rgba(255,255,255,0.08)")
     fig.update_yaxes(
@@ -281,6 +302,7 @@ def build_plotly_dashboard(
         config={
             "displaylogo": False,
             "responsive": True,
+            "scrollZoom": True,
             "toImageButtonOptions": {"format": "png", "filename": "bubbly_dashboard", "scale": 2},
         },
     )

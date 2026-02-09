@@ -42,6 +42,17 @@ From the existing checked-in artifacts:
 - Future optional enhancement: replace C&I proxy with higher-fidelity margin debt feed when available.
 
 ## How to run (fully automated)
+**Status: done with operational workaround**
+- M2 signal is currently sourced from FRED weekly money stock (`WM2NS`) and converted to YoY in code.
+- Operational note remembered from previous work: when FRED had intermittent/API issues, **M2 had to be updated manually** to keep runs unblocked.
+- Action kept in mind: if FRED fails for M2 again, update M2 input manually (or cache local series) before rerunning the model.
+
+### M3 (future hardening candidates)
+**Status: open**
+- Improve data-source robustness/caching (especially for FRED outages).
+- Consider replacing C&I proxy with higher-fidelity margin debt feed when available.
+
+## How to rerun
 
 1. (Optional) Create `apikeys.env` in repo root:
    - `FRED_API_KEY=...`
@@ -64,3 +75,11 @@ From the existing checked-in artifacts:
 - Primary source: FRED `WM2NS`.
 - Automatic fallback: `data/m2_manual.csv`.
 - First-time setup note: if FRED is down and no local cache exists yet, run once when FRED is reachable to seed the cache.
+3. Run:
+   ```bash
+   python bubble_watch.py
+   ```
+4. Open artifacts in `output/`.
+
+## Practical note about M2
+If you observe missing/buggy FRED responses for `WM2NS`, treat M2 as a manual maintenance point for the run (inject/patch the latest M2 values locally, then rerun). This matches the M2 workaround used previously.

@@ -23,6 +23,7 @@ plt.rcParams.update(
 def build_plotly_dashboard(
     hist_df: pd.DataFrame,
     event_dates: list[pd.Timestamp],
+    nowcast_snapshot: Mapping[str, object] | None,
     output_path: str | Path,
 ) -> Path:
     """Create an interactive Plotly dashboard embedded in a custom HTML template."""
@@ -315,6 +316,92 @@ def build_plotly_dashboard(
         },
     )
 
+    nowcast_div = ""
+    if nowcast_snapshot:
+        nowcast_date = pd.Timestamp(nowcast_snapshot["date"])
+        nowcast_fig = go.Figure()
+        nowcast_fig.add_trace(
+            go.Scatter(
+                x=composite.index,
+                y=composite,
+                name="Monthly composite",
+                line=dict(color="#1f77b4", width=2),
+                hovertemplate="Monthly composite: %{y:.2f}<extra></extra>",
+            )
+        )
+        nowcast_fig.add_trace(
+            go.Scatter(
+                x=[composite.index[-1], nowcast_date],
+                y=[composite.iloc[-1], nowcast_snapshot["Composite"]],
+                name="Nowcast bridge",
+                mode="lines",
+                line=dict(color="#ff7f0e", width=2, dash="dash"),
+                hoverinfo="skip",
+            )
+        )
+        nowcast_fig.add_trace(
+            go.Scatter(
+                x=[nowcast_date],
+                y=[nowcast_snapshot["Composite"]],
+                name=f"Current month nowcast ({nowcast_date:%Y-%m-%d})",
+                mode="markers",
+                marker=dict(color="#ff7f0e", size=12, line=dict(color="white", width=1)),
+                hovertemplate=(
+                    "Nowcast as of %{x|%Y-%m-%d}<br>"
+                    "Composite: %{y:.2f}<br>"
+                    "Pressure: %{customdata[0]:.2f}<br>"
+                    "Trigger: %{customdata[1]:.2f}<extra></extra>"
+                ),
+                customdata=[[nowcast_snapshot["Pressure_z"], nowcast_snapshot["Trigger_z"]]],
+            )
+        )
+        for y0, y1, color in [
+            (-4, 1, "rgba(46, 125, 50, 0.18)"),
+            (1, 2, "rgba(249, 199, 79, 0.18)"),
+            (2, 4, "rgba(239, 35, 60, 0.18)"),
+        ]:
+            nowcast_fig.add_hrect(y0=y0, y1=y1, fillcolor=color, line_width=0, layer="below")
+        for thresh in [1, 2]:
+            nowcast_fig.add_hline(y=thresh, line=dict(color="rgba(255,255,255,0.25)", width=1, dash="dot"))
+        nowcast_fig.update_layout(
+            template="plotly_dark",
+            height=380,
+            margin=dict(l=60, r=40, t=40, b=40),
+            hovermode="x unified",
+            paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(family="Inter, sans-serif"),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            hoverlabel=dict(
+                bgcolor="rgba(11, 15, 22, 0.95)",
+                bordercolor="rgba(255, 215, 130, 0.3)",
+                font=dict(size=13, color="#f6f7fb"),
+            ),
+        )
+        nowcast_fig.update_xaxes(
+            title_text="Date",
+            showgrid=True,
+            gridcolor="rgba(255,255,255,0.15)",
+            showline=True,
+            linewidth=1,
+            linecolor="rgba(255,255,255,0.2)",
+        )
+        nowcast_fig.update_yaxes(
+            title_text="Composite (z)",
+            showgrid=True,
+            gridcolor="rgba(255,255,255,0.15)",
+        )
+        nowcast_div = plotly_plot(
+            nowcast_fig,
+            output_type="div",
+            include_plotlyjs=False,
+            config={
+                "displaylogo": False,
+                "responsive": True,
+                "scrollZoom": True,
+                "toImageButtonOptions": {"format": "png", "filename": "bubbly_nowcast", "scale": 2},
+            },
+        )
+
     # --- Construct Full HTML Page ---
     
     html_template = f"""
@@ -387,6 +474,22 @@ def build_plotly_dashboard(
                 box-shadow: 0 20px 45px rgba(5, 10, 22, 0.45);
                 min-height: 800px;
             }}
+            .chart-container + .chart-container {{
+                margin-top: 1.5rem;
+            }}
+            .chart-head {{
+                padding: 0.5rem 0.75rem 0;
+            }}
+            .chart-title {{
+                font-size: 1.05rem;
+                font-weight: 700;
+                letter-spacing: 0.04em;
+            }}
+            .chart-subtitle {{
+                margin-top: 0.35rem;
+                color: rgba(255, 255, 255, 0.65);
+                font-size: 0.92rem;
+            }}
             footer {{
                 text-align: center;
                 padding: 1.5rem;
@@ -408,6 +511,15 @@ def build_plotly_dashboard(
             <div class="chart-container">
                 {obs_div}
             </div>
+            {f'''
+            <div class="chart-container">
+                <div class="chart-head">
+                    <div class="chart-title">Current Month Nowcast</div>
+                    <div class="chart-subtitle">Separate partial-month snapshot, stamped with the true as-of date.</div>
+                </div>
+                {nowcast_div}
+            </div>
+            ''' if nowcast_div else ''}
         </main>
 
         <footer>

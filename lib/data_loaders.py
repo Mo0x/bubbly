@@ -43,7 +43,7 @@ def get_fred_key():
 def get_quandl_key():
     return os.environ.get("QUANDL_API_KEY", "")
 
-def fetch_fred(series_id: str, freq=None) -> pd.Series:
+def fetch_fred(series_id: str, freq=None, quiet: bool = False) -> pd.Series:
     """Fetch FRED series and return as pandas Series"""
     params = {
         "series_id": series_id,
@@ -59,7 +59,8 @@ def fetch_fred(series_id: str, freq=None) -> pd.Series:
         with urllib.request.urlopen(url, timeout=30) as resp:
             data = json.loads(resp.read().decode())
     except Exception as e:
-        print(f"Error fetching FRED series {series_id} via API: {e}")
+        if not quiet:
+            print(f"Error fetching FRED series {series_id} via API: {e}")
         csv_url = "https://fred.stlouisfed.org/graph/fredgraph.csv?" + urllib.parse.urlencode({"id": series_id})
         try:
             with urllib.request.urlopen(csv_url, timeout=30) as resp:
@@ -72,7 +73,8 @@ def fetch_fred(series_id: str, freq=None) -> pd.Series:
             s = pd.to_numeric(s, errors="coerce").dropna()
             return s.sort_index()
         except Exception as csv_exc:
-            print(f"Error fetching FRED series {series_id} via CSV fallback: {csv_exc}")
+            if not quiet:
+                print(f"Error fetching FRED series {series_id} via CSV fallback: {csv_exc}")
             return pd.Series(dtype=float)
 
     vals, dates = [], []
@@ -202,9 +204,13 @@ def ensure_series(obj, name: str) -> pd.Series:
     return obj
 
 def fetch_cape_series(local_path="data/ie_data.xls") -> pd.Series:
-    """Load CAPE from FRED when possible, otherwise fall back to local Shiller file."""
+    """Load CAPE from the local Shiller file when available, otherwise try FRED quietly."""
+    path = Path(local_path)
+    if path.is_file():
+        return fetch_shiller_local_xls(local_path)
+
     try:
-        cape = fetch_fred("CAPE")
+        cape = fetch_fred("CAPE", quiet=True)
         if cape.empty:
             raise ValueError("FRED CAPE series is empty")
         cape = ensure_series(cape, "CAPE")

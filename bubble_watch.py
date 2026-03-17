@@ -39,6 +39,84 @@ from lib.visualization import (
 
 # === Main Pipeline ===
 
+def trim_incomplete_month(monthly_series: pd.Series, last_observation: pd.Timestamp) -> pd.Series:
+    """Drop a partial current-month bucket so mid-month data is not labeled month-end."""
+    if monthly_series.empty or pd.isna(last_observation):
+        return monthly_series
+
+    last_observation = pd.Timestamp(last_observation)
+    if last_observation.is_month_end:
+        return monthly_series
+
+    last_complete_month_end = last_observation + pd.offsets.MonthEnd(-1)
+    return monthly_series[monthly_series.index <= last_complete_month_end]
+
+
+def compute_nowcast_snapshot(
+    hist_df: pd.DataFrame,
+    source_dates: dict[str, pd.Timestamp],
+    weights: dict[str, float],
+    current_raw: dict[str, float],
+) -> dict[str, float | pd.Timestamp] | None:
+    """Build a partial-month nowcast point stamped with the true as-of date."""
+    nowcast_date = max((ts for ts in source_dates.values() if pd.notna(ts)), default=pd.NaT)
+    if pd.isna(nowcast_date) or nowcast_date <= hist_df.index.max():
+        return None
+
+    z_map = {
+        "Buffett": "Buffett_z",
+        "CAPE": "CAPE_z",
+        "CI_Loans_YoY": "CI_Loans_z",
+        "M2_YoY": "M2_YoY_z",
+        "FedBalanceSheet_YoY": "FedBalanceSheet_z",
+        "RRP_YoY": "RRP_z",
+        "HY_Spread": "HY_Spread_z",
+        "IG_Spread": "IG_Spread_z",
+        "VIX": "VIX_z",
+        "VolTerm": "VolTerm_z",
+    }
+    weight_z_map = {
+        "Buffett_ratio": "Buffett_z",
+        "CAPE": "CAPE_z",
+        "CI_Loans_YoY": "CI_Loans_z",
+        "M2_YoY": "M2_YoY_z",
+        "FedBalanceSheet_YoY": "FedBalanceSheet_z",
+        "RRP_YoY": "RRP_z",
+        "HY_Spread": "HY_Spread_z",
+        "IG_Spread": "IG_Spread_z",
+        "VIX": "VIX_z",
+        "VolTerm": "VolTerm_z",
+    }
+
+    nowcast = {"date": pd.Timestamp(nowcast_date)}
+    for raw_col, z_col in z_map.items():
+        history = hist_df[raw_col].dropna()
+        value = current_raw[raw_col]
+        extended = pd.concat([history, pd.Series([value], index=[pd.Timestamp(nowcast_date)])])
+        nowcast[raw_col] = value
+        nowcast[z_col] = float(expanding_zscore(extended).iloc[-1])
+
+    nowcast["Pressure_z"] = float(
+        np.mean([nowcast["Buffett_z"], nowcast["CAPE_z"], nowcast["CI_Loans_z"]])
+    )
+    nowcast["Trigger_z"] = float(
+        np.mean(
+            [
+                -nowcast["M2_YoY_z"],
+                -nowcast["FedBalanceSheet_z"],
+                nowcast["RRP_z"],
+                nowcast["HY_Spread_z"],
+                nowcast["IG_Spread_z"],
+                nowcast["VolTerm_z"],
+                -nowcast["VIX_z"],
+            ]
+        )
+    )
+    nowcast["Composite"] = float(
+        sum(weights[key] * nowcast[z_col] for key, z_col in weight_z_map.items())
+    )
+    return nowcast
+
 def main():
     load_api_keys()
 
@@ -102,25 +180,39 @@ def main():
     ci_loans_yoy_weekly = ci_loans_weekly.pct_change(52) * 100
     
     leverage_yoy_hist = ensure_series(ci_loans_yoy_weekly, "CI_Loans_YoY").resample("ME").last()
+    leverage_yoy_hist = trim_incomplete_month(
+        leverage_yoy_hist,
+        ci_loans_yoy_weekly.dropna().index.max(),
+    )
 
     walcl_weekly = ensure_series(walcl, "FedBalanceSheet").asfreq("W-WED").ffill()
     walcl_weekly = walcl_weekly.reindex(weekly_index).ffill()
     walcl_yoy_weekly = walcl_weekly.pct_change(52) * 100
     walcl_hist = ensure_series(walcl_yoy_weekly, "FedBalanceSheet_YoY").resample("ME").last()
+    walcl_hist = trim_incomplete_month(
+        walcl_hist,
+        walcl_yoy_weekly.dropna().index.max(),
+    )
 
     rrp_daily = ensure_series(rrp, "RRP").sort_index()
     rrp_weekly = rrp_daily.resample("W-FRI").last() # Fallback to Friday
     rrp_weekly = rrp_weekly.reindex(weekly_index, fill_value=0.0)
     rrp_yoy_weekly = rrp_weekly - rrp_weekly.shift(52)
     rrp_hist = ensure_series(rrp_yoy_weekly, "RRP_YoY").resample("ME").last()
+    rrp_hist = trim_incomplete_month(
+        rrp_hist,
+        rrp_yoy_weekly.dropna().index.max(),
+    )
 
     hy_series = ensure_series(hy_spread, "HY_Spread")
     hy_series = hy_series.reindex(wilshire.index, method="ffill").bfill()
     hy_hist = hy_series.resample("ME").mean()
+    hy_hist = trim_incomplete_month(hy_hist, hy_series.dropna().index.max())
 
     ig_series = ensure_series(ig_spread, "IG_Spread")
     ig_series = ig_series.reindex(wilshire.index, method="ffill").bfill()
     ig_hist = ig_series.resample("ME").mean()
+    ig_hist = trim_incomplete_month(ig_hist, ig_series.dropna().index.max())
 
     vix_series = ensure_series(vix, "VIX")
     try:
@@ -136,8 +228,10 @@ def main():
     if vol_term_daily.empty:
         vol_term_hist = vix_series.resample("ME").last().apply(lambda _: 1.0)
         vol_term_hist.name = "VolTerm"
+        vol_term_hist = trim_incomplete_month(vol_term_hist, vix_series.dropna().index.max())
     else:
         vol_term_hist = ensure_series(vol_term_daily, "VolTerm").resample("ME").mean()
+        vol_term_hist = trim_incomplete_month(vol_term_hist, vol_term_daily.dropna().index.max())
 
     # Track latest source dates for report
     source_dates = {
@@ -175,25 +269,48 @@ def main():
     
     # Align all to monthly end
     buffett_hist = ensure_series(buffett, "Buffett")
-    common_index = buffett_hist.index
-
     m_cape = ensure_series(cape, "CAPE").resample("ME").last()
+    m2_monthly = ensure_series(m2_weekly, "M2").resample("ME").last()
+    m2_monthly = trim_incomplete_month(m2_monthly, m2_weekly.dropna().index.max())
+    m2_yoy_monthly = ensure_series(m2_yoy_weekly, "M2_YoY").resample("ME").last()
+    m2_yoy_monthly = trim_incomplete_month(m2_yoy_monthly, m2_yoy_weekly.dropna().index.max())
+    vix_monthly = ensure_series(vix, "VIX").resample("ME").last()
+    vix_monthly = trim_incomplete_month(vix_monthly, vix_series.dropna().index.max())
+    sp_monthly = ensure_series(sp500, "SP500").resample("ME").last()
+    sp_monthly = trim_incomplete_month(sp_monthly, sp500.dropna().index.max())
+
+    monthly_end_candidates = [
+        buffett_hist.index.max(),
+        m_cape.index.max(),
+        m2_monthly.index.max(),
+        m2_yoy_monthly.dropna().index.max(),
+        vix_monthly.index.max(),
+        sp_monthly.index.max(),
+        leverage_yoy_hist.dropna().index.max(),
+        walcl_hist.dropna().index.max(),
+        rrp_hist.dropna().index.max(),
+        hy_hist.dropna().index.max(),
+        ig_hist.dropna().index.max(),
+        vol_term_hist.dropna().index.max(),
+    ]
+    monthly_end = max(ts for ts in monthly_end_candidates if pd.notna(ts))
+    common_index = pd.date_range(start=buffett_hist.index.min(), end=monthly_end, freq="ME")
+
+    buffett_hist = buffett_hist.reindex(common_index).ffill().bfill()
     cape_hist = m_cape.reindex(common_index).ffill().bfill()
     
-    m2_hist = ensure_series(m2_weekly, "M2").resample("ME").last().reindex(common_index).ffill().bfill()
+    m2_hist = m2_monthly.reindex(common_index).ffill().bfill()
     
     m2_yoy_hist = (
-        ensure_series(m2_yoy_weekly, "M2_YoY")
-        .resample("ME")
-        .last()
+        m2_yoy_monthly
         .reindex(common_index)
         .ffill()
         .bfill()
         .fillna(0.0)
     )
     
-    vix_hist = ensure_series(vix, "VIX").resample("ME").last().reindex(common_index).ffill().bfill()
-    sp_hist = ensure_series(sp500, "SP500").resample("ME").last().reindex(common_index).ffill().bfill()
+    vix_hist = vix_monthly.reindex(common_index).ffill().bfill()
+    sp_hist = sp_monthly.reindex(common_index).ffill().bfill()
     
     hy_hist = hy_hist.reindex(common_index).ffill().bfill()
     leverage_yoy_hist = leverage_yoy_hist.reindex(common_index).ffill().bfill().fillna(0.0)
@@ -277,6 +394,24 @@ def main():
         + weights["IG_Spread"] * hist_df["IG_Spread_z"]
     )
     hist_df["SPX_Drawdown"] = hist_df["SP500"] / hist_df["SP500"].cummax() - 1.0
+
+    current_raw = {
+        "Buffett": float(buffett.dropna().iloc[-1]),
+        "CAPE": float(ensure_series(cape, "CAPE").dropna().iloc[-1]),
+        "CI_Loans_YoY": float(ci_loans_yoy_weekly.dropna().iloc[-1]),
+        "M2_YoY": float(m2_yoy_weekly.dropna().iloc[-1]),
+        "FedBalanceSheet_YoY": float(walcl_yoy_weekly.dropna().iloc[-1]),
+        "RRP_YoY": float(rrp_yoy_weekly.dropna().iloc[-1]),
+        "HY_Spread": float(hy_series.dropna().iloc[-1]),
+        "IG_Spread": float(ig_series.dropna().iloc[-1]),
+        "VIX": float(vix_series.dropna().iloc[-1]),
+        "VolTerm": float(
+            ensure_series(vol_term_daily, "VolTerm").dropna().iloc[-1]
+            if not vol_term_daily.empty
+            else 1.0
+        ),
+    }
+    nowcast_snapshot = compute_nowcast_snapshot(hist_df, source_dates, weights, current_raw)
 
     # Validation
     signals_full, summary_full = build_validation_tables(hist_df)
@@ -411,6 +546,7 @@ def main():
     dashboard_path = build_plotly_dashboard(
         hist_df,
         event_dates=event_dates,
+        nowcast_snapshot=nowcast_snapshot,
         output_path=Path("docs") / "index.html",
     )
     print(f"Interactive dashboard saved to {dashboard_path}")

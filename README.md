@@ -19,7 +19,7 @@ The Bubbly Index is a weighted composite of **10 indicators**, categorized into 
 
 #### 1. Valuation Pressure (Structural)
 High values indicate an expensive, overextended market.
-- **Buffett Ratio (30%)**: Total US Stock Market Cap / GDP. The ultimate measure of valuations relative to the economy.
+- **Buffett Ratio (30%)**: Total US Stock Market Cap / GDP, extended with GDP-scaled Personal Income once quarterly GDP runs out so the signal can keep updating monthly.
 - **Shiller CAPE (30%)**: Cyclically Adjusted P/E Ratio. Valuations normalized for the business cycle.
 - **C&I Loans YoY (22%)**: Commercial & Industrial Loans growth. A proxy for corporate leverage and "animal spirits."
 

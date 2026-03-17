@@ -11,9 +11,8 @@
   - The plumbing is already in place to drop in this higher-fidelity leverage feed.
 
 ### Monthly Update Requirements (Data Freshness)
-- **GDP / Buffett Ratio Lag**: Currently limited by quarterly GDP releases. To achieve monthly updates:
-  - Implement a monthly GDP proxy using high-frequency data (e.g., Industrial Production, Retail Sales) to interpolate/extrapolate monthly GDP estimates.
-  - OR switch the denominator of the Buffett Ratio to a monthly metric like **Total Personal Income** or a monthly GDP measure if available from a reliable source (e.g., Macroeconomic Advisers, though often paid).
+- **Buffett Ratio monthly tracker**: Buffett now extends past the last GDP quarter using GDP-scaled `PI` (Personal Income) so the chart can keep updating monthly.
+  - Revisit whether to keep `PI` as the fast tracker or replace it with a richer monthly activity basket / paid monthly GDP nowcast.
 - **CAPE Ratio Lag**: Shiller CAPE is released with a lag.
   - Implement a "Nowcast CAPE" using the realtime S&P 500 price and the 10-year moving average of earnings (interpolated from quarterly earnings). This would allow daily/weekly updates of the CAPE ratio .
 ### Front end

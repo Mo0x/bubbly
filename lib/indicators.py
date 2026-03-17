@@ -83,3 +83,44 @@ def monthly_gdp_with_proxy(gdp: pd.Series, proxy: pd.Series) -> pd.Series:
     blended = gdp_m * adj
     blended.name = "GDP"
     return blended
+
+
+def extend_monthly_denominator_with_proxy(
+    base_quarterly: pd.Series,
+    monthly_proxy: pd.Series,
+    proxy_name: str = "FastProxy",
+) -> pd.Series:
+    """Extend a quarterly denominator with a monthly proxy rebased to the same level.
+
+    The proxy is only used after the last available quarter, which preserves the
+    original historical construction while allowing fresher monthly updates.
+    """
+    base_q = ensure_series(base_quarterly, "BaseDenominator").sort_index().dropna()
+    proxy_m = ensure_series(monthly_proxy, proxy_name).sort_index().dropna()
+
+    if base_q.empty:
+        return proxy_m.resample("ME").last().ffill()
+    if proxy_m.empty:
+        base_m = base_q.copy()
+        base_m.index = base_m.index + pd.offsets.QuarterEnd(0)
+        return base_m.resample("ME").ffill()
+
+    base_q.index = base_q.index + pd.offsets.QuarterEnd(0)
+    base_m = base_q.resample("ME").ffill()
+    proxy_m = proxy_m.resample("ME").last().ffill()
+
+    proxy_q = proxy_m.resample("QE").last()
+    overlap = pd.concat([base_q.rename("base"), proxy_q.rename("proxy")], axis=1, join="inner").dropna()
+
+    scale = 1.0
+    if not overlap.empty:
+        ratios = overlap["base"] / overlap["proxy"]
+        ratios = ratios.replace([np.inf, -np.inf], np.nan).dropna()
+        if not ratios.empty:
+            scale = float(ratios.median())
+
+    proxy_scaled = (proxy_m * scale).rename(base_q.name)
+    extension = proxy_scaled[proxy_scaled.index > base_m.index.max()]
+    extended = pd.concat([base_m, extension]).sort_index()
+    extended.name = base_q.name
+    return extended

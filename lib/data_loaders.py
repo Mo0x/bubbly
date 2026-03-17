@@ -4,6 +4,7 @@ import urllib.parse
 import json
 import socket
 from pathlib import Path
+from io import StringIO
 import pandas as pd
 import yfinance as yf
 import numpy as np
@@ -58,8 +59,21 @@ def fetch_fred(series_id: str, freq=None) -> pd.Series:
         with urllib.request.urlopen(url, timeout=30) as resp:
             data = json.loads(resp.read().decode())
     except Exception as e:
-        print(f"Error fetching FRED series {series_id}: {e}")
-        return pd.Series(dtype=float)
+        print(f"Error fetching FRED series {series_id} via API: {e}")
+        csv_url = "https://fred.stlouisfed.org/graph/fredgraph.csv?" + urllib.parse.urlencode({"id": series_id})
+        try:
+            with urllib.request.urlopen(csv_url, timeout=30) as resp:
+                csv_text = resp.read().decode("utf-8")
+            df = pd.read_csv(StringIO(csv_text))
+            date_col = next((c for c in ("DATE", "observation_date") if c in df.columns), None)
+            if date_col is None or series_id not in df.columns:
+                raise RuntimeError(f"Unexpected FRED CSV shape for {series_id}")
+            s = pd.Series(df[series_id].values, index=pd.to_datetime(df[date_col]), name=series_id)
+            s = pd.to_numeric(s, errors="coerce").dropna()
+            return s.sort_index()
+        except Exception as csv_exc:
+            print(f"Error fetching FRED series {series_id} via CSV fallback: {csv_exc}")
+            return pd.Series(dtype=float)
 
     vals, dates = [], []
     for o in data.get("observations", []):

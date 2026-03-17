@@ -25,6 +25,7 @@ from lib.indicators import (
     monthly_gdp_with_proxy,
     expanding_zscore,
     extend_gdp_with_nowcast,
+    extend_monthly_denominator_with_proxy,
 )
 from lib.composite import (
     compute_realtime_composite,
@@ -57,6 +58,7 @@ def main():
     rrp = fetch_fred("RRPONTSYAWARD")
     ig_spread = fetch_fred("BAA10Y")
     indpro = fetch_fred("INDPRO")
+    personal_income = fetch_fred("PI")
 
     # Yahoo series
     wilshire = fetch_yahoo("^W5000")
@@ -78,14 +80,21 @@ def main():
     gdp = ensure_series(gdp, "GDP")
 
     gdp_m = monthly_gdp_with_proxy(gdp, indpro)
+    buffett_denominator = extend_monthly_denominator_with_proxy(
+        gdp,
+        personal_income,
+        proxy_name="PersonalIncome",
+    )
+    if buffett_denominator.index.max() <= gdp_m.index.max():
+        buffett_denominator = gdp_m
     wilshire_m = wilshire.resample("ME").last()
     
     # Align for Buffett
-    buffett_df = pd.concat([wilshire_m, gdp_m], axis=1, join="inner")
-    buffett_df.columns = ["Wilshire", "GDP"]
-    buffett = (buffett_df["Wilshire"] / buffett_df["GDP"]) * 100.0
+    buffett_df = pd.concat([wilshire_m, buffett_denominator], axis=1, join="inner")
+    buffett_df.columns = ["Wilshire", "Denominator"]
+    buffett = (buffett_df["Wilshire"] / buffett_df["Denominator"]) * 100.0
     buffett = buffett.dropna()
-    buffett.name = "Buffett % GDP"
+    buffett.name = "Buffett-style valuation ratio"
 
     # 2. Process weekly/daily into monthly history
     ci_loans_weekly = ensure_series(ci_loans_weekly, "CI_Loans").asfreq("W-WED").ffill()
@@ -273,7 +282,7 @@ def main():
     signals_full, summary_full = build_validation_tables(hist_df)
     
     lag_map = {
-        "Buffett_ratio": 2,
+        "Buffett_ratio": 1,
         "CAPE": 3,
         "CI_Loans_YoY": 1,
         "M2_YoY": 1,

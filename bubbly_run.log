@@ -419,3 +419,102 @@ Report saved to docs/bubbly_report.html
 ========================================================
 ✅ Bubbly Pipeline Completed Successfully.
 ========================================================
+========================================================
+Starting Bubbly Pipeline
+Root Directory: /home/phuture/bubbly
+Python Command: venv/bin/python
+========================================================
+[1/3] Running bubble_watch.py...
+Fetching data ...
+M2 source: FRED WM2NS (cache refreshed at data/m2_manual.csv)
+CAPE source: official Shiller workbook refreshed at data/ie_data.xls
+
+--- BUBBLY REPORT ---
+                     Z-score  Latest_value  Weight  Contribution   Last_date
+Buffett_ratio           2.66        214.16    0.27          0.73  2026-01-31
+CAPE                    1.81         39.21    0.27          0.49  2026-03-01
+CI_Loans_YoY           -0.01          4.47    0.20         -0.00  2026-02-28
+M2_YoY                 -0.33          4.22   -0.23          0.07  2026-02-02
+FedBalanceSheet_YoY    -0.52         -2.25   -0.18          0.09  2026-03-04
+RRP_YoY                 0.00          0.00    0.14          0.00  2026-03-04
+HY_Spread              -0.77          2.91    0.22         -0.17  2026-03-03
+IG_Spread              -0.83          1.69    0.11         -0.09  2026-03-03
+VIX                     0.03         19.86   -0.16         -0.00  2026-03-17
+VolTerm                -0.08          0.91    0.22         -0.02  2026-03-17
+
+Composite phase index: 1.11 → Euphoria
+Valuation pressure: 1.49 | Liquidity/vol trigger: -0.12
+Interactive dashboard saved to docs/index.html
+Report saved to docs/bubbly_report.html
+[2/3] Verifying artifacts...
+✅ Found: docs/index.html
+✅ Found: docs/bubbly_history.csv
+✅ Found: docs/bubbly_report.html
+========================================================
+✅ Bubbly Pipeline Completed Successfully.
+========================================================
+========================================================
+Starting Bubbly Pipeline
+Root Directory: /home/phuture/bubbly
+Python Command: venv/bin/python
+========================================================
+[1/3] Running bubble_watch.py...
+Fetching data ...
+Error fetching FRED series WM2NS via API: HTTP Error 429: Too Many Requests
+Error fetching FRED series WM2NS via CSV fallback: The read operation timed out
+M2 source: FRED WM2NS (cache refreshed at data/m2_manual.csv)
+Traceback (most recent call last):
+  File "/home/phuture/bubbly/bubble_watch.py", line 579, in <module>
+    main()
+    ~~~~^^
+  File "/home/phuture/bubbly/bubble_watch.py", line 130, in main
+    m2_weekly, m2_yoy_weekly = compute_weekly_m2_yoy()
+                               ~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/phuture/bubbly/lib/data_loaders.py", line 289, in compute_weekly_m2_yoy
+    m2_weekly = m2_weekly.asfreq("W-MON")
+  File "/home/phuture/bubbly/venv/lib/python3.14/site-packages/pandas/core/generic.py", line 8901, in asfreq
+    return asfreq(
+        self,
+    ...<4 lines>...
+        fill_value=fill_value,
+    )
+  File "/home/phuture/bubbly/venv/lib/python3.14/site-packages/pandas/core/resample.py", line 3109, in asfreq
+    new_obj.index = _asfreq_compat(obj.index, freq)
+                    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/phuture/bubbly/venv/lib/python3.14/site-packages/pandas/core/resample.py", line 3149, in _asfreq_compat
+    raise TypeError(type(index))
+TypeError: <class 'pandas.RangeIndex'>
+========================================================
+Starting Bubbly Pipeline
+Root Directory: /home/phuture/bubbly
+Python Command: venv/bin/python
+========================================================
+[1/3] Running bubble_watch.py...
+Fetching data ...
+M2 source: FRED WM2NS (cache refreshed at data/m2_manual.csv)
+CAPE source: official Shiller workbook refreshed at data/ie_data.xls
+
+--- BUBBLY REPORT ---
+                     Z-score  Latest_value  Weight  Contribution   Last_date
+Buffett_ratio           3.15        237.76    0.27          0.86  2026-06-30
+CAPE                    1.75         38.93    0.27          0.48  2026-03-01
+CI_Loans_YoY            0.41          7.93    0.20          0.08  2026-04-30
+M2_YoY                 -0.22          4.66   -0.23          0.05  2026-05-04
+FedBalanceSheet_YoY    -0.43         -0.14   -0.18          0.08  2026-05-20
+RRP_YoY                 0.00          0.00    0.14          0.00  2026-05-20
+HY_Spread              -3.04          2.78    0.22         -0.66  2026-06-02
+IG_Spread              -0.92          1.62    0.11         -0.10  2026-06-02
+VIX                    -0.59         15.32   -0.16          0.10  2026-06-03
+VolTerm                -0.22          0.84    0.22         -0.05  2026-06-02
+
+Composite phase index: 0.83 → Expansion
+Valuation pressure: 1.77 | Liquidity/vol trigger: -0.42
+Interactive dashboard saved to docs/index.html
+Report saved to docs/bubbly_report.html
+[2/3] Verifying artifacts...
+✅ Found: docs/index.html
+✅ Found: docs/bubbly_history.csv
+✅ Found: docs/bubbly_report.html
+========================================================
+✅ Bubbly Pipeline Completed Successfully.
+========================================================

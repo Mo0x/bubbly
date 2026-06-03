@@ -14,6 +14,10 @@ socket.setdefaulttimeout(30)
 
 FRED_KEY = os.environ.get("FRED_API_KEY", "")
 QUANDL_KEY = os.environ.get("QUANDL_API_KEY", "")
+SHILLER_XLS_URL = (
+    "https://img1.wsimg.com/blobby/go/e5e77e0b-59d1-44d9-ab25-4763ac982e53/"
+    "downloads/3228b83a-7bad-4e69-b405-71e3a1ca6351/ie_data.xls?ver=1772737019751"
+)
 
 def load_api_keys(env_path: str = "apikeys.env") -> None:
     """Populate missing env vars from simple KEY=VALUE file."""
@@ -193,6 +197,20 @@ def fetch_shiller_local_xls(path="data/ie_data.xls") -> pd.Series:
 
     return s
 
+
+def refresh_shiller_workbook(
+    local_path: str | Path = "data/ie_data.xls",
+    source_url: str = SHILLER_XLS_URL,
+) -> Path:
+    """Refresh the local Shiller workbook from the official public download URL."""
+    path = Path(local_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    req = urllib.request.Request(source_url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        payload = resp.read()
+    path.write_bytes(payload)
+    return path
+
 def ensure_series(obj, name: str) -> pd.Series:
     """Ensure we are working with a single pandas Series."""
     if isinstance(obj, pd.DataFrame):
@@ -204,10 +222,16 @@ def ensure_series(obj, name: str) -> pd.Series:
     return obj
 
 def fetch_cape_series(local_path="data/ie_data.xls") -> pd.Series:
-    """Load CAPE from the local Shiller file when available, otherwise try FRED quietly."""
+    """Refresh and load CAPE from the official Shiller workbook when possible."""
     path = Path(local_path)
-    if path.is_file():
-        return fetch_shiller_local_xls(local_path)
+    try:
+        refreshed = refresh_shiller_workbook(local_path)
+        print(f"CAPE source: official Shiller workbook refreshed at {refreshed}")
+        return fetch_shiller_local_xls(refreshed)
+    except Exception as exc:
+        if path.is_file():
+            print(f"CAPE source: local workbook fallback at {path} ({type(exc).__name__})")
+            return fetch_shiller_local_xls(path)
 
     try:
         cape = fetch_fred("CAPE", quiet=True)

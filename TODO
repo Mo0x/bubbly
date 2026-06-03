@@ -15,6 +15,7 @@
   - Revisit whether to keep `PI` as the fast tracker or replace it with a richer monthly activity basket / paid monthly GDP nowcast.
 - **CAPE Ratio Lag**: Shiller CAPE is released with a lag.
   - Implement a "Nowcast CAPE" using the realtime S&P 500 price and the 10-year moving average of earnings (interpolated from quarterly earnings). This would allow daily/weekly updates of the CAPE ratio .
+  - Use that CAPE proxy only in the separate nowcast panel, while keeping the main monthly chart on canonical Shiller CAPE.
 ### Front end
   - Improve naviagation inside index.html:
       - EG you can zoom in chart with raw/zscore be cannot go back to main page. We need a fuild navigation experience. 

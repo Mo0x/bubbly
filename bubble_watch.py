@@ -294,7 +294,9 @@ def main():
         vol_term_hist.dropna().index.max(),
     ]
     monthly_end = max(ts for ts in monthly_end_candidates if pd.notna(ts))
-    common_index = pd.date_range(start=buffett_hist.index.min(), end=monthly_end, freq="ME")
+    last_completed_month_end = pd.Timestamp.now("UTC").tz_localize(None).normalize() + pd.offsets.MonthEnd(-1)
+    canonical_end = min(monthly_end, last_completed_month_end)
+    common_index = pd.date_range(start=buffett_hist.index.min(), end=canonical_end, freq="ME")
 
     buffett_hist = buffett_hist.reindex(common_index).ffill().bfill()
     cape_hist = m_cape.reindex(common_index).ffill().bfill()

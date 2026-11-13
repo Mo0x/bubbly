@@ -145,23 +145,38 @@ def fetch_shiller_local_xls(path="data/ie_data.xls") -> pd.Series:
     Read Shiller CAPE (cyclically adjusted P/E, column 'CAPE') from local Excel file
     downloaded from shillerdata.com
     """
+    df = fetch_shiller_table(path)
+    s = pd.Series(df["CAPE"].astype(float).values, index=df.index)
+    s.name = "CAPE"
+    return s
+
+
+def fetch_shiller_table(path="data/ie_data.xls") -> pd.DataFrame:
+    """
+    Read the Shiller workbook into a normalized monthly table.
+
+    The workbook publishes monthly average price (`P`), CPI, and CAPE.
+    We preserve those columns so CAPE can be extended beyond the last
+    workbook month using live S&P 500 data.
+    """
     # Read the sheet and normalize column names
     try:
         df = pd.read_excel(path, sheet_name="Data", skiprows=7)
     except Exception as e:
          print(f"Error reading local Shiller file: {e}")
-         return pd.Series(dtype=float, name="CAPE")
+         return pd.DataFrame(columns=["P", "CPI", "CAPE"])
 
     df.columns = [str(c).strip() for c in df.columns]
 
     # Basic column sanity
-    if "Date" not in df.columns or "CAPE" not in df.columns:
+    required_cols = {"Date", "P", "CPI", "CAPE"}
+    if not required_cols.issubset(set(df.columns)):
          # fail silently or log? Original raised RuntimeError.
          # We will raise to match original behavior if vital.
-         raise RuntimeError("No 'Date' or 'CAPE' column found in Shiller file")
+         raise RuntimeError(f"Missing required columns in Shiller file: {sorted(required_cols)}")
 
     # Drop fully empty rows first (this avoids NaN crashing conversion)
-    df = df.dropna(subset=["Date", "CAPE"], how="any")
+    df = df.dropna(subset=["Date", "P", "CPI", "CAPE"], how="any")
 
     # Convert Shiller fractional date (e.g. 2025.10) -> pandas Timestamp(2025-10-01)
     def ym_to_timestamp(x):
@@ -183,19 +198,21 @@ def fetch_shiller_local_xls(path="data/ie_data.xls") -> pd.Series:
         return pd.Timestamp(year=year, month=month, day=1)
 
     df["ts"] = df["Date"].apply(ym_to_timestamp)
-    df = df.dropna(subset=["ts", "CAPE"])
+    df = df.dropna(subset=["ts"])
+    table = (
+        df[["ts", "P", "CPI", "CAPE"]]
+        .assign(
+            P=lambda x: pd.to_numeric(x["P"], errors="coerce"),
+            CPI=lambda x: pd.to_numeric(x["CPI"], errors="coerce"),
+            CAPE=lambda x: pd.to_numeric(x["CAPE"], errors="coerce"),
+        )
+        .dropna(subset=["P", "CPI", "CAPE"])
+        .set_index("ts")
+        .sort_index()
+    )
 
-    # Build time series
-    s = pd.Series(df["CAPE"].astype(float).values, index=df["ts"])
-    s.name = "CAPE"
-    s = s.sort_index()
-
-    # Optional: keep last ~40 years (stabilizes z-scores)
-    # Original code had this cut off.
-    cutoff = s.index.max() - pd.DateOffset(years=40)
-    s = s[s.index >= cutoff]
-
-    return s
+    cutoff = table.index.max() - pd.DateOffset(years=40)
+    return table[table.index >= cutoff]
 
 
 def refresh_shiller_workbook(
@@ -245,6 +262,73 @@ def fetch_cape_series(local_path="data/ie_data.xls") -> pd.Series:
     except Exception:
         return fetch_shiller_local_xls(local_path)
 
+
+def extend_cape_with_market(
+    local_path: str | Path,
+    sp500_daily: pd.Series,
+    cpi_monthly: pd.Series | None = None,
+) -> tuple[pd.Series, float, pd.Timestamp]:
+    """
+    Extend CAPE beyond the last Shiller workbook month.
+
+    For completed months we use the monthly average S&P 500 level to match
+    the workbook's `P` column. For the current incomplete month we use the
+    latest daily close as a live nowcast. CPI is used when available so the
+    approximation stays in real terms.
+    """
+    shiller = fetch_shiller_table(local_path)
+    if shiller.empty:
+        cape = fetch_cape_series(local_path)
+        latest_date = pd.Timestamp(sp500_daily.dropna().index.max())
+        latest_cape = float(cape.dropna().iloc[-1])
+        return cape, latest_cape, latest_date
+
+    sp500_daily = ensure_series(sp500_daily, "SP500").dropna().sort_index()
+    if sp500_daily.empty:
+        cape = pd.Series(shiller["CAPE"].astype(float).values, index=shiller.index, name="CAPE")
+        latest_date = pd.Timestamp(shiller.index.max())
+        latest_cape = float(cape.dropna().iloc[-1])
+        return cape, latest_cape, latest_date
+
+    anchor = shiller.iloc[-1]
+    anchor_date = pd.Timestamp(shiller.index.max())
+    anchor_price = float(anchor["P"])
+    anchor_cpi = float(anchor["CPI"])
+    anchor_cape = float(anchor["CAPE"])
+
+    if cpi_monthly is None:
+        cpi_lookup = pd.Series(dtype=float)
+    else:
+        cpi_lookup = ensure_series(cpi_monthly, "CPI").dropna().sort_index()
+        cpi_lookup.index = cpi_lookup.index.to_period("M").to_timestamp(how="start")
+
+    def cape_from_price(price: float, month_start: pd.Timestamp) -> float:
+        cpi_target = anchor_cpi
+        if not cpi_lookup.empty:
+            cpi_target = float(cpi_lookup.reindex([month_start], method="ffill").iloc[0])
+        return anchor_cape * (price / anchor_price) * (anchor_cpi / cpi_target)
+
+    cape = pd.Series(shiller["CAPE"].astype(float).values, index=shiller.index, name="CAPE")
+
+    latest_market_date = pd.Timestamp(sp500_daily.index.max())
+    current_month_start = latest_market_date.to_period("M").to_timestamp(how="start")
+    next_month_start = anchor_date + pd.offsets.MonthBegin(1)
+
+    if next_month_start <= current_month_start:
+        for month_start in pd.date_range(next_month_start, current_month_start, freq="MS"):
+            month_end = month_start + pd.offsets.MonthEnd(0)
+            month_prices = sp500_daily[(sp500_daily.index >= month_start) & (sp500_daily.index <= month_end)]
+            if month_prices.empty:
+                continue
+            if month_start < current_month_start:
+                price = float(month_prices.mean())
+            else:
+                price = float(month_prices.iloc[-1])
+            cape.loc[month_start] = cape_from_price(price, month_start)
+
+    current_cape = float(cape_from_price(float(sp500_daily.iloc[-1]), current_month_start))
+    return cape.sort_index(), current_cape, latest_market_date
+
 def load_m2_cache(cache_path: str | Path = "data/m2_manual.csv") -> pd.Series | None:
     """Load cached/manual M2 weekly levels when FRED is unavailable."""
     path = Path(cache_path)
@@ -259,7 +343,10 @@ def load_m2_cache(cache_path: str | Path = "data/m2_manual.csv") -> pd.Series | 
         )
 
     s = pd.Series(df["M2"].astype(float).values, index=pd.to_datetime(df["date"]), name="M2")
-    return s.sort_index().dropna()
+    s = s.sort_index().dropna()
+    if s.empty:
+        return None
+    return s
 
 def save_m2_cache(m2_weekly: pd.Series, cache_path: str | Path = "data/m2_manual.csv") -> Path:
     """Persist M2 weekly levels so runs can continue through temporary FRED outages."""
@@ -274,6 +361,8 @@ def compute_weekly_m2_yoy(cache_path: str | Path = "data/m2_manual.csv") -> tupl
     """Return weekly M2 levels and YoY % derived from WM2NS with automatic local fallback."""
     try:
         m2_weekly = ensure_series(fetch_fred("WM2NS"), "M2")
+        if m2_weekly.dropna().empty:
+            raise RuntimeError("FRED WM2NS returned no observations")
         save_m2_cache(m2_weekly, cache_path)
         print(f"M2 source: FRED WM2NS (cache refreshed at {cache_path})")
     except Exception as exc:

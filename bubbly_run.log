@@ -518,3 +518,168 @@ Report saved to docs/bubbly_report.html
 ========================================================
 ✅ Bubbly Pipeline Completed Successfully.
 ========================================================
+========================================================
+Starting Bubbly Pipeline
+Root Directory: /home/phuture/bubbly
+Python Command: venv/bin/python
+========================================================
+[1/3] Running bubble_watch.py...
+Fetching data ...
+Error fetching FRED series WM2NS via API: HTTP Error 429: Too Many Requests
+Error fetching FRED series WM2NS via CSV fallback: The read operation timed out
+M2 source: FRED WM2NS (cache refreshed at data/m2_manual.csv)
+Traceback (most recent call last):
+  File "/home/phuture/bubbly/bubble_watch.py", line 580, in <module>
+    main()
+    ~~~~^^
+  File "/home/phuture/bubbly/bubble_watch.py", line 130, in main
+    m2_weekly, m2_yoy_weekly = compute_weekly_m2_yoy()
+                               ~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/phuture/bubbly/lib/data_loaders.py", line 373, in compute_weekly_m2_yoy
+    m2_weekly = m2_weekly.asfreq("W-MON")
+  File "/home/phuture/bubbly/venv/lib/python3.14/site-packages/pandas/core/generic.py", line 8901, in asfreq
+    return asfreq(
+        self,
+    ...<4 lines>...
+        fill_value=fill_value,
+    )
+  File "/home/phuture/bubbly/venv/lib/python3.14/site-packages/pandas/core/resample.py", line 3109, in asfreq
+    new_obj.index = _asfreq_compat(obj.index, freq)
+                    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/phuture/bubbly/venv/lib/python3.14/site-packages/pandas/core/resample.py", line 3149, in _asfreq_compat
+    raise TypeError(type(index))
+TypeError: <class 'pandas.RangeIndex'>
+========================================================
+Starting Bubbly Pipeline
+Root Directory: /home/phuture/bubbly
+Python Command: venv/bin/python
+========================================================
+[1/3] Running bubble_watch.py...
+Fetching data ...
+Error fetching FRED series WM2NS via API: HTTP Error 429: Too Many Requests
+Error fetching FRED series WM2NS via CSV fallback: The read operation timed out
+M2 source: local cache fallback at data/m2_manual.csv (RuntimeError)
+Traceback (most recent call last):
+  File "pandas/_libs/tslibs/offsets.pyx", line 6313, in pandas._libs.tslibs.offsets.to_offset
+  File "pandas/_libs/tslibs/offsets.pyx", line 6195, in pandas._libs.tslibs.offsets._validate_to_offset_alias
+ValueError: for Period, please use 'M' instead of 'MS'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/phuture/bubbly/bubble_watch.py", line 580, in <module>
+    main()
+    ~~~~^^
+  File "/home/phuture/bubbly/bubble_watch.py", line 149, in main
+    cape, current_cape, cape_nowcast_date = extend_cape_with_market("data/ie_data.xls", sp500, cpi)
+                                            ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/phuture/bubbly/lib/data_loaders.py", line 303, in extend_cape_with_market
+    cpi_lookup.index = cpi_lookup.index.to_period("M").to_timestamp("MS")
+                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/home/phuture/bubbly/venv/lib/python3.14/site-packages/pandas/core/indexes/period.py", line 202, in to_timestamp
+    arr = self._data.to_timestamp(freq, how)
+  File "/home/phuture/bubbly/venv/lib/python3.14/site-packages/pandas/core/arrays/period.py", line 836, in to_timestamp
+    freq = Period._maybe_convert_freq(freq)
+  File "pandas/_libs/tslibs/period.pyx", line 1844, in pandas._libs.tslibs.period._Period._maybe_convert_freq
+  File "pandas/_libs/tslibs/offsets.pyx", line 6352, in pandas._libs.tslibs.offsets.to_offset
+  File "pandas/_libs/tslibs/offsets.pyx", line 6137, in pandas._libs.tslibs.offsets.raise_invalid_freq
+ValueError: Invalid frequency: MS. Failed to parse with error message: ValueError("for Period, please use 'M' instead of 'MS'")
+========================================================
+Starting Bubbly Pipeline
+Root Directory: /home/phuture/bubbly
+Python Command: venv/bin/python
+========================================================
+[1/3] Running bubble_watch.py...
+Fetching data ...
+Error fetching FRED series WM2NS via API: HTTP Error 429: Too Many Requests
+Error fetching FRED series WM2NS via CSV fallback: The read operation timed out
+M2 source: local cache fallback at data/m2_manual.csv (RuntimeError)
+Traceback (most recent call last):
+  File "pandas/_libs/tslibs/offsets.pyx", line 6313, in pandas._libs.tslibs.offsets.to_offset
+  File "pandas/_libs/tslibs/offsets.pyx", line 6195, in pandas._libs.tslibs.offsets._validate_to_offset_alias
+ValueError: for Period, please use 'M' instead of 'MS'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/phuture/bubbly/bubble_watch.py", line 580, in <module>
+    main()
+    ~~~~^^
+  File "/home/phuture/bubbly/bubble_watch.py", line 149, in main
+    cape, current_cape, cape_nowcast_date = extend_cape_with_market("data/ie_data.xls", sp500, cpi)
+                                            ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/phuture/bubbly/lib/data_loaders.py", line 314, in extend_cape_with_market
+    current_month_start = latest_market_date.to_period("M").to_timestamp("MS")
+  File "pandas/_libs/tslibs/period.pyx", line 2122, in pandas._libs.tslibs.period._Period.to_timestamp
+  File "pandas/_libs/tslibs/period.pyx", line 1844, in pandas._libs.tslibs.period._Period._maybe_convert_freq
+  File "pandas/_libs/tslibs/offsets.pyx", line 6352, in pandas._libs.tslibs.offsets.to_offset
+  File "pandas/_libs/tslibs/offsets.pyx", line 6137, in pandas._libs.tslibs.offsets.raise_invalid_freq
+ValueError: Invalid frequency: MS. Failed to parse with error message: ValueError("for Period, please use 'M' instead of 'MS'")
+========================================================
+Starting Bubbly Pipeline
+Root Directory: /home/phuture/bubbly
+Python Command: venv/bin/python
+========================================================
+[1/3] Running bubble_watch.py...
+Fetching data ...
+Error fetching FRED series WM2NS via API: HTTP Error 429: Too Many Requests
+Error fetching FRED series WM2NS via CSV fallback: The read operation timed out
+M2 source: local cache fallback at data/m2_manual.csv (RuntimeError)
+
+--- BUBBLY REPORT ---
+                     Z-score  Latest_value  Weight  Contribution   Last_date
+Buffett_ratio           3.15        237.76    0.27          0.86  2026-06-30
+CAPE                    2.08         41.22    0.27          0.57  2026-06-03
+CI_Loans_YoY            0.41          7.93    0.20          0.08  2026-04-30
+M2_YoY                 -0.22          4.66   -0.23          0.05  2026-05-04
+FedBalanceSheet_YoY    -0.43         -0.14   -0.18          0.08  2026-05-20
+RRP_YoY                 0.00          0.00    0.14          0.00  2026-05-20
+HY_Spread              -3.04          2.78    0.22         -0.66  2026-06-02
+IG_Spread              -0.92          1.62    0.11         -0.10  2026-06-02
+VIX                    -0.59         15.32   -0.16          0.10  2026-06-03
+VolTerm                -0.22          0.84    0.22         -0.05  2026-06-03
+
+Composite phase index: 0.92 → Expansion
+Valuation pressure: 1.88 | Liquidity/vol trigger: -0.42
+Interactive dashboard saved to docs/index.html
+Report saved to docs/bubbly_report.html
+[2/3] Verifying artifacts...
+✅ Found: docs/index.html
+✅ Found: docs/bubbly_history.csv
+✅ Found: docs/bubbly_report.html
+========================================================
+✅ Bubbly Pipeline Completed Successfully.
+========================================================
+========================================================
+Starting Bubbly Pipeline
+Root Directory: /home/phuture/bubbly
+Python Command: venv/bin/python
+========================================================
+[1/3] Running bubble_watch.py...
+Fetching data ...
+M2 source: FRED WM2NS (cache refreshed at data/m2_manual.csv)
+
+--- BUBBLY REPORT ---
+                     Z-score  Latest_value  Weight  Contribution   Last_date
+Buffett_ratio           2.76        227.72    0.27          0.75  2026-11-30
+CAPE                    2.17         42.32    0.27          0.59  2026-11-12
+CI_Loans_YoY            0.67         10.15    0.20          0.13  2026-09-30
+M2_YoY                  0.03          5.70   -0.23         -0.01  2026-10-05
+FedBalanceSheet_YoY    -0.32          2.37   -0.18          0.06  2026-10-28
+RRP_YoY                 0.00          0.00    0.14          0.00  2026-10-28
+HY_Spread              -1.46          3.22    0.22         -0.32  2026-11-12
+IG_Spread              -1.13          1.46    0.11         -0.12  2026-11-12
+VIX                    -0.03         19.42   -0.16          0.00  2026-11-13
+VolTerm                -0.12          0.89    0.22         -0.03  2026-11-12
+
+Composite phase index: 1.07 → Euphoria
+Valuation pressure: 1.87 | Liquidity/vol trigger: -0.34
+Interactive dashboard saved to docs/index.html
+Report saved to docs/bubbly_report.html
+[2/3] Verifying artifacts...
+✅ Found: docs/index.html
+✅ Found: docs/bubbly_history.csv
+✅ Found: docs/bubbly_report.html
+========================================================
+✅ Bubbly Pipeline Completed Successfully.
+========================================================

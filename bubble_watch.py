@@ -17,7 +17,7 @@ from lib.data_loaders import (
     load_api_keys,
     fetch_fred,
     fetch_yahoo,
-    fetch_cape_series,
+    extend_cape_with_market,
     ensure_series,
     compute_weekly_m2_yoy,
 )
@@ -137,6 +137,7 @@ def main():
     ig_spread = fetch_fred("BAA10Y")
     indpro = fetch_fred("INDPRO")
     personal_income = fetch_fred("PI")
+    cpi = fetch_fred("CPIAUCSL")
 
     # Yahoo series
     wilshire = fetch_yahoo("^W5000")
@@ -145,7 +146,7 @@ def main():
     vxv = fetch_yahoo("^VIX3M")
 
     # CAPE
-    cape = fetch_cape_series("data/ie_data.xls")
+    cape, current_cape, cape_nowcast_date = extend_cape_with_market("data/ie_data.xls", sp500, cpi)
 
     # === Process & align data ===
     
@@ -236,7 +237,7 @@ def main():
     # Track latest source dates for report
     source_dates = {
         "Buffett_ratio": buffett.index.max(),
-        "CAPE": cape.index.max(),
+        "CAPE": cape_nowcast_date,
         "CI_Loans_YoY": leverage_yoy_hist.dropna().index.max(),
         "M2_YoY": m2_yoy_weekly.dropna().index.max(),
         "FedBalanceSheet_YoY": walcl_yoy_weekly.dropna().index.max(),
@@ -399,7 +400,7 @@ def main():
 
     current_raw = {
         "Buffett": float(buffett.dropna().iloc[-1]),
-        "CAPE": float(ensure_series(cape, "CAPE").dropna().iloc[-1]),
+        "CAPE": float(current_cape),
         "CI_Loans_YoY": float(ci_loans_yoy_weekly.dropna().iloc[-1]),
         "M2_YoY": float(m2_yoy_weekly.dropna().iloc[-1]),
         "FedBalanceSheet_YoY": float(walcl_yoy_weekly.dropna().iloc[-1]),
